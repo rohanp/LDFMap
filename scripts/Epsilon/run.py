@@ -8,12 +8,12 @@ import pyximport
 pyximport.install(setup_args={"include_dirs":np.get_include()},
                   reload_support=True)
 
-import calcEpsilon_nogil
+import calcEpsilon_gil
 #import test_cython
 
 t0 = time.time()
 
-numModels = 500
+numModels = 100
 
 r = np.random.rand(numModels, numModels)
 RMSD = (np.tril(r) + np.tril(r).T) * (1 - np.eye(r.shape[0]))*4
@@ -26,7 +26,7 @@ epsilons = []
 
 for i in range(numModels):
 	print("######## epsilon {0} ########".format(i))
-	epsilons.append(calcEpsilon_nogil.calcEpsilon(i, RMSD, possibleEpsilons, 0.3))
+	epsilons.append(calcEpsilon_gil.calcEpsilon(i, RMSD, possibleEpsilons, 0.3))
 
 
 print(epsilons)
