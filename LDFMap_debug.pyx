@@ -1,11 +1,12 @@
-#cython: wraparound=True, boundscheck=True, cdivision=True
+#cython: wraparound=False, boundscheck=True, cdivision=True
 #cython: profile=True, nonecheck=True, overflowcheck=True
 #cython: cdivision_warnings=True, unraisable_tracebacks=True
 
-""" An Python/Cython implementation of the Locally-Scaled Diffusion Map 
-	Dimensionality Reduction Technique. Debug Version contains more prints,
-	none/overflow/bounds checks, and never releases the GIL. Running the debug
-	version is reccomended before running the normal version.
+""" A Python/Cython implementation of the Locally-Scaled Diffusion Map 
+	Dimensionality Reduction Technique. Debug Version contains runtime exceptions,
+	none/overflow/bounds checks, more print statements, never releases the GIL or
+	uses parallelism. Running the debug version is reccomended before running the 
+	faster yet less cautious normal version.
 """
 __author__ = "Rohan Pandit"
 
@@ -18,15 +19,33 @@ cdef extern from "rmsd.h":
 	double rmsd(int n, double* x, double* y)
 
 def main(filename, num_atoms, num_models):
+	start = time()
+
 	t0 = time()
+	print("Parsing file...")
 	coords = PDBParser(filename, num_atoms, num_models)
+	print("File Parsed in {0} seconds".format(round(time()-start,3)))
+	
+	t0 = time()
+	print("Calculating RMSD")
 	RMSD = calcRMSD(coords, num_atoms, num_models)
-	print(RMSD)
+	print("Calculated RMSD in {0} seconds".format(round(time()-start,3)))
+	print("Saving RMSD to 'Output/RSMD.txt'")
+	np.savetxt('Output/RMSD.txt', RMSD, fmt='%8.3f')
+
+	t0 = time()
 	epsilons = calcEpsilons(RMSD)
-	print(epsilons)
+	print("Saving epsilons to Output/epsilons.txt")
+	np.savetxt('Output/epsilons.txt', epsilons)
+
+	t0 = time()
 	P = calcMarkovMatrix(RMSD, epsilons)
 	print(P)
-	print("Done! {0} seconds".format(round(time() - t0, 3)))
+	print("Completed transition matrix in {0} seconds".format(round(time()-t0,3)))
+	print("Saving output to Output/markov.txt")
+	np.savetxt('Output/markov.txt', P)
+
+	print("Done! {0} seconds".format(round(time() - start, 3)))
 
 def PDBParser(filename, num_atoms, num_models):
 	""" Takes PDB filename with M models and A atoms, returns Mx3A matrix
@@ -38,14 +57,23 @@ def PDBParser(filename, num_atoms, num_models):
 	coord_list = []
 
 	for line in f:
-		if 'END MODEL' in line:
+		len_ = len(line)
+		if 'END' in line:
 			modelnum += 1
-		elif 33 < len(line):
+		elif len_ == 79: 
+			#columns 33 to 56 contain the xyz coordinates
 			coord_list.extend(line[33:56].split())
-			#writes out just the coordinates 
 
 	coords = np.array(map(float, coord_list))
-	coords = np.reshape(coords, (num_models, num_atoms * 3))
+	try:
+		coords = np.reshape(coords, (num_models, num_atoms * 3))
+	except ValueError:
+		raise Exception("""
+			Could not parse PDB file. Make sure your PDB file is 
+			formatted like the example, 'Input/Met-Enk.pdb' and 
+			that you entered the correct values for num_atoms and 
+			num_models. 
+						""")
 
 	return coords
 
@@ -55,7 +83,6 @@ def calcRMSD(coords, num_atoms, num_models):
 		Returns MxM RMSD matrix.   
 	"""
 
-	print("Calculating RMSD")
 	return _calcRMSD(coords, num_atoms, num_models)
 
 cdef _calcRMSD(double[:,:] coords, long num_atoms, long num_models):
@@ -67,28 +94,29 @@ cdef _calcRMSD(double[:,:] coords, long num_atoms, long num_models):
 	RMSD_view = RMSD
 
 	for i in range(num_models):
-		print("on RMSD row {0}".format(i))
+		if i % 10 == 0:
+			print("on RMSD row {0}".format(i))
 		for j in range(i+1, num_models):
 			# '&' because rmsd is a C++ function that takes pointers
-			RMSD_view[i][j] = rmsd(num_atoms, &coords[i,0], &coords[j,0])
+			RMSD_view[i][j] = rmsd(num_atoms*3, &coords[i,0], &coords[j,0])
 			RMSD_view[j][i] = RMSD_view[i][j]
 
 	return RMSD
 
 def calcEpsilons(RMSD, cutoff = 0.03):
-	""" Takes RMSD matrix and optional cutoff parameter and implements the algorithm
-		described in Clementi et al. to estimate the distance around each model 
-		which can be considered locally flat. Returns an array of these distances,
-		one for each model.
+	""" Takes RMSD matrix and optional cutoff parameter and implements the 
+		algorithm described in Clementi et al. to estimate the distance around
+		each model which can be considered locally flat. Returns an array of 
+		length M of these distances.
 	"""
 
 	max_epsilon = np.max(RMSD)
+	print("Max RMSD: {0}".format(max_epsilon))
 	possible_epsilons = np.array([(3./7.)*max_epsilon, (1./2.)*max_epsilon, (4./7.)*max_epsilon])
 	epsilons = np.ones(RMSD.shape[0])
 
 	print("Possible Epsilons: {0}".format(possible_epsilons))
 
-	print("Calculating Epsilons")
 	for xi in range(RMSD.shape[0]):
 		print("On epsilon {0}".format(xi))
 		epsilons[xi] = _calcEpsilon(xi, RMSD, possible_epsilons, cutoff)
@@ -97,36 +125,36 @@ def calcEpsilons(RMSD, cutoff = 0.03):
 
 cdef double _calcEpsilon(int xi, RMSD, double[:] possible_epsilons, float cutoff) except? 1:
 	cdef:
-		int i, j
+		int i, j, dim
 		long a
 		double[:,:] eiegenvals, eigenvals_view
 		long[:,:] status_vectors
 		long[:] local_dim
 
-	print("--- calculating eigenvalues")
-	eigenvals_view = calcMDS(xi, RMSD, possible_epsilons)
+	print("----- calculating eigenvalues")
+	eigenvals_view = _calcMDS(xi, RMSD, possible_epsilons)
 
-	print("--- calculating status vectors")
-	status_vectors = calcStatusVectors( np.asarray(eigenvals_view) )
+	print("----- calculating status vectors")
+	status_vectors = _calcStatusVectors( np.asarray(eigenvals_view) )
 
 	local_dim = np.zeros(status_vectors.shape[0], dtype=long)
 
-	print("--- calculating local intrinsic dimensionality")
+	print("----- calculating local intrinsic dimensionality")
 	for e in range(status_vectors.shape[0]):
-		local_dim[e] = calcIntrinsicDim(status_vectors[e,:])
+		local_dim[e] = _calcIntrinsicDim(status_vectors[e,:])
 
-	print("--- calculating epsilon")
+	print("----- calculating epsilon")
 	for dim in range(local_dim[e], eigenvals_view.shape[1]):
 		for e in range(eigenvals_view.shape[0]):
 			for i in range(dim, eigenvals_view.shape[1]):
-				if cutoff < derivative(eigenvals_view[:,i], possible_epsilons, e):
+				if cutoff < _derivative(eigenvals_view[:,i], possible_epsilons, e):
 					break
 			else:
 				return possible_epsilons[e]
 
-	raise Exception("Did not converge — returning 1")
+	raise Exception("Did not reach convergence. Try increasing cutoff")
 
-cdef double[:,:] calcMDS(int xi, RMSD, double[:] possible_epsilons):
+cpdef double[:,:] _calcMDS(int xi, RMSD, double[:] possible_epsilons):
 	cdef:
 		double[:] A
 		double[:,:] neighbors_matrix
@@ -151,7 +179,7 @@ cdef double[:,:] calcMDS(int xi, RMSD, double[:] possible_epsilons):
 	return eigenvals_view[:,:max_neighbors]
 
 
-cdef long calcIntrinsicDim(long[:] sv) except? 1: #sv = status vector
+cdef long _calcIntrinsicDim(long[:] sv) except? 1: #sv = status vector
 	cdef long i
 
 	# * 1 1 0 0 0 * in status vectors marks the separation between noise and non-noise
@@ -159,9 +187,17 @@ cdef long calcIntrinsicDim(long[:] sv) except? 1: #sv = status vector
 		if sv[i-2] and sv[i-1] and not sv[i] and not sv[i+3] and not sv[i+4]:
 			return i
 
-	raise Exception("ERROR: No noise non-noise separation — returning 1")
+	print( np.asarray(sv) )
+	raise Exception(""" 
+		No noise non-noise separation. The non-debug version would
+		return the smallest possible epsilon in this case. However,
+		if this exception is pervasive throughout your dataset,
+		you may want to try defining the non-noise noise separation
+		more conservatively or adjust the requirements for a status
+		vector to have an entry of '1' or '0'.
+					""")
 
-cdef long[:,:] calcStatusVectors(eigenvals):
+cpdef long[:,:] _calcStatusVectors(eigenvals):
 	cdef:
 		double[:,:] sv_view, svx2_view
 		int e, i
@@ -176,20 +212,22 @@ cdef long[:,:] calcStatusVectors(eigenvals):
 	try:
 		dsv = np.zeros(( sv.shape[0], sv.shape[1] - 5 ), dtype=long)
 	except ValueError:
-		raise Exception("Status Vector fewer than 5 elements")
+		raise Exception(""" 
+			Status Vector fewer than 5 elements. Try increasing the 
+			possible epsilon values. 
+						""")
 
 	#Each discrete status vector entry is set to 1 if its status vector entry is greater 
 	#than twice of each of the next five status vector entries, else stays 0.
 	for e in range( sv_view.shape[0] ):
 		for i in range( sv_view.shape[1] - 5 ):
 			if sv_view[e][i] > svx2_view[e][i+1] and sv_view[e][i] > svx2_view[e][i+2] \
-			and sv_view[e][i] > svx2_view[e][i+3] and sv_view[e][i] > svx2_view[e][i+4] \
-			and sv_view[e][i] > svx2_view[e][i+5]:
+			and sv_view[e][i] > svx2_view[e][i+3] and sv_view[e][i] > svx2_view[e][i+4]:
 				dsv[e][i] = 1
 
 	return dsv
 
-cdef inline double derivative(double[:] eigenvals, double[:] epsilons, long e):
+cdef inline double _derivative(double[:] eigenvals, double[:] epsilons, long e):
 	cdef double derivative 
 	if e == 0:
 		derivative = (eigenvals[1] - eigenvals[0])/(epsilons[1] - epsilons[0])
@@ -226,6 +264,9 @@ cdef double[:,:] _calcMarkovMatrix(double[:,:] RMSD, double[:] epsilons, int N):
 			Dtilda[i] += Ktilda[i][j]
 
 			P[i][j] = Ktilda[i][j]/Dtilda[i]
+
+	if np.isnan(np.sum(P)): #check if any NaNs in P
+		raise Exception("NaNs in the markov transition matrix.")
 
 	return P
 

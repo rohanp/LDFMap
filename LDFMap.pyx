@@ -1,8 +1,11 @@
-#cython: wraparound=True, boundscheck=False, cdivision=True
-#cython: profile=False, nonecheck=False, overflowcheck=False
-#cython: cdivision_warnings=False
-#filename: calcEpsilon.pyx
-#by Rohan Pandit
+#cython: wraparound=False, boundscheck=False, cdivision=True, profile=False
+#cython: nonecheck=False, overflowcheck=False, cdivision_warnings=False
+
+""" An Python/Cython implementation of the Locally-Scaled Diffusion Map 
+	Dimensionality Reduction Technique. 
+"""
+
+__author__ = "Rohan Pandit"
 
 import numpy as np
 cimport numpy as np
@@ -10,9 +13,6 @@ from libc.math cimport sqrt, exp
 
 cdef extern from "rmsd.h":
 	double rmsd(int n, double* x, double* y)
-
-def main():
-	pass
 
 def PDBParser(filename, num_atoms, num_models):
 	""" Takes PDB file with M models and A atoms, returns Mx3A matrix
@@ -25,10 +25,11 @@ def PDBParser(filename, num_atoms, num_models):
 	modelnum = 0
 
 	for line in f:
+		len_ = len(line)
 		if 'END MODEL' in line:
 			modelnum += 1
 			out.write('\n')
-		elif 33 < len(line):
+		elif len_ == 78 or len_ == 66 or len_ == 54:
 			out.write(l[33:56])
 			#writes out just the coordinates 
 
@@ -84,7 +85,7 @@ def calcEpsilon(RMSD, cutoff = 0.03):
 
 cdef double _calcEpsilon(int xi, RMSD, double[:] possibleEpsilons, float cutoff):
 	cdef:
-		int i, j
+		int i, j, dim
 		long a
 		double[:,:] eiegenvals, eigenvals_view
 		long[:,:] status_vectors
