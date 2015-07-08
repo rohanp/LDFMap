@@ -26,7 +26,7 @@ cpdef double calcEpsilon(int xi, RMSD, double[:] possibleEpsilons, float cutoff)
 
 	print("Calculating local intrinsic dimensionality")
 	for e in range(status_vectors.shape[0]):
-		local_dim[e] = calcIntrinsicDim(status_vectors[i,:])
+		local_dim[e] = calcIntrinsicDim(status_vectors[e,:])
 
 	print("Calculating epsilon")
 	for dim in range(local_dim[e], eigenvals_view.shape[1]):

@@ -1,29 +1,27 @@
+#!/usr/bin/env python
+""" Converts PDB files to CRD files. NOT Python3 compatible """
+__author__ = "Rohan Pandit"
+
 import sys
 import os
 
 def main():
-	#Example Usage: python3 pdb2crd.py Met-Enk 180
+	#Example Usage: python2.7 pdb2crd.py Met-Enk.pdb 180
 	name = sys.argv[1]
 	numAtoms = int(sys.argv[2])
 
-	os.chdir("..")
-	os.chdir("..")
-	os.chdir("input")
-	f = open(name + '.pdb', 'r')
+	f = open(name, 'r')
 	modelnum = 0
 
-	os.chdir("..")
-	os.chdir("scripts/RMSD/data")
-	out=open(name + '.crd', 'w')
+	out=open(name[:-4] + '.crd', 'w')
 
 	for l in f:
 		if 'END MODEL' in l:
 			modelnum+=1
-			#out=open(name + str(modelnum) + '.crd', 'w')
+			out.write('\n')
 		elif len(l)>33:
-			out.write(l[33:56] + '\n')
+			out.write(l[33:56])
 
-	splitFile(name+'.crd', numAtoms)
 
 def splitFile(inFileName, numAtoms):
 	infile = open(inFileName, 'r')
