@@ -15,6 +15,9 @@ cimport numpy as np
 from time import time
 from libc.math cimport sqrt, exp
 
+np.set_printoptions(precision=3)
+np.set_printoptions(threshold=200)
+
 cdef extern from "rmsd.h":
 	double rmsd(int n, double* x, double* y)
 
@@ -38,6 +41,8 @@ def main(filename, num_atoms, num_models):
 	print("Saving epsilons to Output/epsilons.txt")
 	np.savetxt('Output/epsilons.txt', epsilons)
 
+	print(epsilons)
+
 	t0 = time()
 	P = calcMarkovMatrix(RMSD, epsilons)
 	print(P)
@@ -45,7 +50,7 @@ def main(filename, num_atoms, num_models):
 	print("Saving output to Output/markov.txt")
 	np.savetxt('Output/markov.txt', P)
 
-	print("Done! {0} seconds".format(round(time() - start, 3)))
+	print("Done! Total time: {0} seconds".format(round(time() - start, 3)))
 
 def PDBParser(filename, num_atoms, num_models):
 	""" Takes PDB filename with M models and A atoms, returns Mx3A matrix
@@ -73,7 +78,7 @@ def PDBParser(filename, num_atoms, num_models):
 			formatted like the example, 'Input/Met-Enk.pdb' and 
 			that you entered the correct values for num_atoms and 
 			num_models. 
-						""")
+						""".replace('\t',''))
 
 	return coords
 
@@ -134,14 +139,27 @@ cdef double _calcEpsilon(int xi, RMSD, double[:] possible_epsilons, float cutoff
 	print("----- calculating eigenvalues")
 	eigenvals_view = _calcMDS(xi, RMSD, possible_epsilons)
 
+	if eigenvals_view[0][0] == -1:
+		return possible_epsilons[1]
+
 	print("----- calculating status vectors")
 	status_vectors = _calcStatusVectors( np.asarray(eigenvals_view) )
+
+	#if there was error in _calcStatusVectors, returns -1
+	if status_vectors[0][0] == -1:
+		return  possible_epsilons[1]
 
 	local_dim = np.zeros(status_vectors.shape[0], dtype=long)
 
 	print("----- calculating local intrinsic dimensionality")
 	for e in range(status_vectors.shape[0]):
 		local_dim[e] = _calcIntrinsicDim(status_vectors[e,:])
+
+	if xi % 10 == 0:
+		f = open("epsilon_{0}_data".format(xi), 'w')
+		f.write("Epsilon {0}".format(xi))
+		f.write("Eigenvalues: ")
+
 
 	print("----- calculating epsilon")
 	for dim in range(local_dim[e], eigenvals_view.shape[1]):
@@ -165,6 +183,12 @@ cpdef double[:,:] _calcMDS(int xi, RMSD, double[:] possible_epsilons):
 	for i, e in enumerate(possible_epsilons):
 		#find indexes of all neighbors
 		neighbors_idxs = np.where( RMSD[xi,:] <= e )[0]
+
+		#ERROR: no neighbors. insert a -1 so that calcEpsilon knows
+		#an error has occured and will return the middle epsilon.
+		if neighbors_idxs.shape[0] < 2:
+			return np.zeros( (10, 10) ) - 1.
+
 		#create RMSD matrix of just these neighbors
 		neighbors_matrix = RMSD[ neighbors_idxs, : ][ :, neighbors_idxs ]
 		
@@ -180,11 +204,20 @@ cpdef double[:,:] _calcMDS(int xi, RMSD, double[:] possible_epsilons):
 
 
 cdef long _calcIntrinsicDim(long[:] sv) except? 1: #sv = status vector
+	#TODO: This method can made more efficient by remoiving redundent checking.
+	#		Would be tricky and involve lots of if statements, probably not worth.
+
 	cdef long i
 
 	# * 1 1 0 0 0 * in status vectors marks the separation between noise and non-noise
 	for i in range(2, sv.shape[0] - 4):
-		if sv[i-2] and sv[i-1] and not sv[i] and not sv[i+3] and not sv[i+4]:
+		if sv[i-2] and sv[i-1] and not sv[i] and not sv[i+1] and not sv[i+2] and not sv[i+3]:
+			return i
+
+	# If last method did not find separation, the condition for separation must be more lenient
+	# * 1 0 0 0 * marks separation
+	for i in range(sv.shape[0] - 3, 1, -1):
+		if sv[i-1] and not sv[i] and not sv[i+1] and not sv[i+2]:
 			return i
 
 	print( np.asarray(sv) )
@@ -195,7 +228,7 @@ cdef long _calcIntrinsicDim(long[:] sv) except? 1: #sv = status vector
 		you may want to try defining the non-noise noise separation
 		more conservatively or adjust the requirements for a status
 		vector to have an entry of '1' or '0'.
-					""")
+					""".replace('\t',''))
 
 cpdef long[:,:] _calcStatusVectors(eigenvals):
 	cdef:
@@ -210,12 +243,15 @@ cpdef long[:,:] _calcStatusVectors(eigenvals):
 	svx2_view = svx2
 
 	try:
-		dsv = np.zeros(( sv.shape[0], sv.shape[1] - 5 ), dtype=long)
+		dsv = np.zeros(( sv.shape[0], sv.shape[1] - 4 ), dtype=long)
 	except ValueError:
-		raise Exception(""" 
-			Status Vector fewer than 5 elements. Try increasing the 
-			possible epsilon values. 
-						""")
+		return np.zeros(sv.shape, dtype=long) - 1
+		raise Exception("""
+			Status Vector fewer than 4 elements. The non-debug version would
+			return the middle epsilon in this case. Try increasing the possible
+			epsilon values to avoid this exception. Or maybe your dataset is just
+			too small.
+						""".replace('\t',''))
 
 	#Each discrete status vector entry is set to 1 if its status vector entry is greater 
 	#than twice of each of the next five status vector entries, else stays 0.
@@ -260,10 +296,20 @@ cdef double[:,:] _calcMarkovMatrix(double[:,:] RMSD, double[:] epsilons, int N):
 			K[i][j] = exp( (-RMSD[i][j]*RMSD[i][j]) / (2*epsilons[i]*epsilons[j]) )
 			D[i] += K[i][j]
 
+	for i in range(N):
+		for j in range(N):
 			Ktilda[i][j] = K[i][j]/sqrt(D[i]*D[j])
 			Dtilda[i] += Ktilda[i][j]
 
+	for i in range(N):
+		for j in range(N):
 			P[i][j] = Ktilda[i][j]/Dtilda[i]
+
+	np.savetxt('Output/K.txt', K, fmt='%8.3f')
+	np.savetxt('Output/D.txt', D, fmt='%8.3f')
+	np.savetxt('Output/Ktilda.txt', Ktilda, fmt='%8.3f')
+	np.savetxt('Output/Dtilda.txt', Dtilda, fmt='%8.3f')
+	np.savetxt('Output/P.txt', K, fmt='%8.3f')
 
 	if np.isnan(np.sum(P)): #check if any NaNs in P
 		raise Exception("NaNs in the markov transition matrix.")
