@@ -1,15 +1,17 @@
 # What is this?
-A fast, Cython implementation of the [Locally Scaled Diffusion Map](rohanp.io/MakingSenseOfBigMolecularData.pdf) 
+A fast, Cython implementation of the [Locally Scaled Diffusion Map](http://rohanp.io/MakingSenseOfBigMolecularData.pdf) 
 dimensionality reduction technique intended for use in computational biology.
 
 # Installation
-Simply download this repo, move "LDFMap.so" to your project directory and <code>import LDFMap</code>. Only Python 2.x is currently supported.
+Simply download this repo, move "LDFMap.so" to your project directory and `import LDFMap`. 
+
+The debug version has more checks and raises exceptions (at the cost of speed), and is reccomended if the main program is giving errors. Only Python 2.x is currently supported.
 
 # Public Methods
 ```cython
 def PDBParser(filename, num_atoms, num_models):
-	""" Takes PDB filename with M models and A atoms, returns Mx3A matrix
-		containing the XYZ coordinates of all atoms.
+    """ Takes PDB filename with M models and A atoms, returns Mx3A matrix
+	    containing the XYZ coordinates of all atoms.
 	"""
 
 def calcRMSD(coords, num_atoms, num_models):
@@ -45,10 +47,16 @@ epsilons = calcEpsilons(RMSD)
 P = calcMarkovMatrix(RMSDs, epsilons)
 ```
 
-# Algorithm
-
 # Dev Information
+You can modify the program to fit your needs. After making changes to `src/LDFMap.pyx`, these changes must
+be compiled by `setup.py`, which must be modified for your system (see comments in setup.py for more information). Run `python2.7 setup.py build_ext --inplace` to compile the Cython script into C extension that you may then import into Python and use.
+
+Compiling requires a number of dependencies:
+	* Cython
+	* NumPy
+	* LAPACK
+	* BLAS
 
 # TODO
-
+Singular Value Decomposition (using NumPy's linear algebra package) has been a huge bottleneck. Currently trying to find a way to get around this.
 
