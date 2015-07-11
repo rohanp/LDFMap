@@ -1,0 +1,54 @@
+# What is this?
+A fast, Cython implementation of the [Locally Scaled Diffusion Map](rohanp.io/MakingSenseOfBigMolecularData.pdf) 
+dimensionality reduction technique intended for use in computational biology.
+
+# Installation
+Simply download this repo, move "LDFMap.so" to your project directory and <code>import LDFMap</code>. 
+
+# Public Methods
+```cython
+def PDBParser(filename, num_atoms, num_models):
+	""" Takes PDB filename with M models and A atoms, returns Mx3A matrix
+		containing the XYZ coordinates of all atoms.
+	"""
+
+def calcRMSD(coords, num_atoms, num_models):
+    """ Takes coordinates from PDB parser and calculates pairwise least 
+    	root-mean-squared distance between all models with given coordinates.
+    	Returns MxM RMSD matrix.   
+    """
+
+def calcEpsilons(RMSD, cutoff = 0.03):
+    """ Takes RMSD matrix and optional cutoff parameter and implements the 
+    	algorithm described in Clementi et al. to estimate the distance around
+    	each model which can be considered locally flat. Returns an array of 
+    	length M of these distances.
+    """
+def calcMarkovMatrix(RMSD, epsilons):
+	""" Takes the MxM RMSD matrix and the array of epsilons of length M,
+		returns the MxM Markov transition matrix, which gives the transitional
+		probability between any two structures.
+	"""
+```
+
+# Example Usage:
+```cython
+import LDFMap
+
+coords = LDFMap.PDBParser("Met-Enk.pdb", num_atoms = 75, num_models = 180) 
+#arguments can be keyworded or positional
+
+RMSDs = LDFMap.calcRMSDs(coords, 75, 180)
+
+epsilons = calcEpsilons(RMSD)
+
+P = calcMarkovMatrix(RMSDs, epsilons)
+```
+
+# Algorithm
+
+# Dev Information
+
+# TODO
+
+
