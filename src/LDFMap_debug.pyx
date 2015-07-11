@@ -32,15 +32,15 @@ def main(filename, num_atoms, num_models):
 	print("Calculating RMSD")
 	RMSD = calcRMSD(coords, num_atoms, num_models)
 	print("Calculated RMSD in {0} seconds".format(round(time()-start,3)))
-	print("Saving RMSD to 'Output/RSMD.txt'")
-	np.savetxt('Output/RMSD.txt', RMSD, fmt='%8.3f')
+	print("Saving RMSD to 'output/RSMD.txt'")
+	np.savetxt('output/RMSD.txt', RMSD, fmt='%8.3f')
 
 	t0 = time()
 	print("Calculating epsilons")
 	epsilons = calcEpsilons(RMSD)
 	print("Calculated epsilons in {0} seconds".format(round(time()-start,3)))	
-	print("Saving epsilons to Output/epsilons.txt")
-	np.savetxt('Output/epsilons.txt', epsilons)
+	print("Saving epsilons to output/epsilons.txt")
+	np.savetxt('output/epsilons.txt', epsilons)
 
 	print(epsilons)
 
@@ -48,8 +48,8 @@ def main(filename, num_atoms, num_models):
 	P = calcMarkovMatrix(RMSD, epsilons)
 	print(P)
 	print("Completed transition matrix in {0} seconds".format(round(time()-t0,3)))
-	print("Saving output to Output/markov.txt")
-	np.savetxt('Output/markov.txt', P)
+	print("Saving output to output/markov.txt")
+	np.savetxt('output/markov.txt', P)
 
 	print("Done! Total time: {0} seconds".format(round(time() - start, 3)))
 
@@ -99,7 +99,8 @@ cdef _calcRMSD(double[:,:] coords, long num_atoms, long num_models):
 	RMSD = np.zeros((num_models, num_models))
 	RMSD_view = RMSD
 
-	for i in prange(num_models, nogil=True, schedule='dynamic', chunksize=200, num_threads=4):
+	#for i in prange(num_models, nogil=True, schedule='dynamic', chunksize=200, num_threads=4):
+	for i in range(num_models):
 		if i % 10 == 0:
 			print("on RMSD row {0}".format(i))
 		for j in range(i+1, num_models):
@@ -313,11 +314,11 @@ cdef double[:,:] _calcMarkovMatrix(double[:,:] RMSD, double[:] epsilons, int N):
 		for j in range(N):
 			P[i][j] = Ktilda[i][j]/Dtilda[i]
 
-	np.savetxt('Output/K.txt', K, fmt='%8.3f')
-	np.savetxt('Output/D.txt', D, fmt='%8.3f')
-	np.savetxt('Output/Ktilda.txt', Ktilda, fmt='%8.3f')
-	np.savetxt('Output/Dtilda.txt', Dtilda, fmt='%8.3f')
-	np.savetxt('Output/P.txt', K, fmt='%8.3f')
+	np.savetxt('output/K.txt', K, fmt='%8.3f')
+	np.savetxt('output/D.txt', D, fmt='%8.3f')
+	np.savetxt('output/Ktilda.txt', Ktilda, fmt='%8.3f')
+	np.savetxt('output/Dtilda.txt', Dtilda, fmt='%8.3f')
+	np.savetxt('output/P.txt', K, fmt='%8.3f')
 
 	print(np.sum(P))
 

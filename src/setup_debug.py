@@ -16,8 +16,8 @@ setup(
     					include_dirs = [np.get_include(), "/Users/rohanp/LDFMap/src/include"],
     					language="c++",
     					libraries = ["lapack", "blas"],
-    					library_dirs = ["/Users/rohanp/LDFMap/src/Include"],
-    					extra_compile_args = ["-I /Users/rohanp/LDFMap/src/Include", "-I /usr/local/include"],
+    					library_dirs = ["/Users/rohanp/LDFMap/src/include"],
+    					extra_compile_args = ["-I /Users/rohanp/LDFMap/src/include", "-I /usr/local/include"],
     					)])
    							
    	)
