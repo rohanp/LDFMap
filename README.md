@@ -3,7 +3,7 @@ A fast, Cython implementation of the [Locally Scaled Diffusion Map](rohanp.io/Ma
 dimensionality reduction technique intended for use in computational biology.
 
 # Installation
-Simply download this repo, move "LDFMap.so" to your project directory and <code>import LDFMap</code>. 
+Simply download this repo, move "LDFMap.so" to your project directory and <code>import LDFMap</code>. Only Python 2.x is currently supported.
 
 # Public Methods
 ```cython
