@@ -53,10 +53,10 @@ be compiled by `setup.py`, which must be modified for your system (see comments 
 
 Compiling requires a number of dependencies:
 
-	* Cython
-	* NumPy
-	* LAPACK
-	* BLAS
+* 	Cython
+* 	NumPy
+* 	LAPACK
+* 	BLAS
 
 # TODO
 Singular Value Decomposition (using NumPy's linear algebra package) has been a huge bottleneck. Currently trying to find a way to get around this.
