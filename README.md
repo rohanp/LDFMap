@@ -52,6 +52,7 @@ You can modify the program to fit your needs. After making changes to `src/LDFMa
 be compiled by `setup.py`, which must be modified for your system (see comments in setup.py for more information). Run `python2.7 setup.py build_ext --inplace` to compile the Cython script into C extension that you may then import into Python and use.
 
 Compiling requires a number of dependencies:
+
 	* Cython
 	* NumPy
 	* LAPACK
