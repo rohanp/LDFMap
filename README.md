@@ -26,11 +26,13 @@ def calcEpsilons(RMSD, cutoff = 0.03):
     	each model which can be considered locally flat. Returns an array of 
     	length M of these distances.
     """
+
 def calcMarkovMatrix(RMSD, epsilons):
 	""" Takes the MxM RMSD matrix and the array of epsilons of length M,
 		returns the MxM Markov transition matrix, which gives the transitional
 		probability between any two structures.
 	"""
+
 def main(filename, num_atoms, num_models):
         """ Runs all the above methods and saves their results in output/ """
 ```
