@@ -105,8 +105,8 @@ cdef _calcRMSD(double[:,:] coords, long num_atoms, long num_models):
 			print("on RMSD row {0}".format(i))
 		for j in range(i+1, num_models):
 			# '&' because rmsd is a C++ function that takes pointers
-			RMSD_view[i][j] = rmsd(num_atoms*3, &coords[i,0], &coords[j,0])
-			RMSD_view[j][i] = RMSD_view[i][j]
+			RMSD_view[i, j] = rmsd(num_atoms*3, &coords[i,0], &coords[j,0])
+			RMSD_view[j, i] = RMSD_view[i, j]
 
 	return RMSD
 
@@ -201,7 +201,7 @@ cpdef double[:,:] _calcMDS(int xi, RMSD, double[:] possible_epsilons):
 		A = np.linalg.svd( neighbors_matrix, compute_uv=False )
 
 		for j in range(A.shape[0]):
-			eigenvals_view[i][j] = A[j]*A[j]
+			eigenvals_view[i, j] = A[j]*A[j]
 
 	return eigenvals_view[:,:max_neighbors]
 
@@ -266,9 +266,9 @@ cpdef long[:,:] _calcStatusVectors(eigenvals):
 	#than twice of each of the next five status vector entries, else stays 0.
 	for e in range( sv_view.shape[0] ):
 		for i in range( sv_view.shape[1] - 5 ):
-			if sv_view[e][i] > svx2_view[e][i+1] and sv_view[e][i] > svx2_view[e][i+2] \
-			and sv_view[e][i] > svx2_view[e][i+3] and sv_view[e][i] > svx2_view[e][i+4]:
-				dsv[e][i] = 1
+			if sv_view[e, i] > svx2_view[e, i+1] and sv_view[e, i] > svx2_view[e, i+2] \
+			and sv_view[e, i] > svx2_view[e, i+3] and sv_view[e, i] > svx2_view[e, i+4]:
+				dsv[e, i] = 1
 
 	return dsv
 
@@ -302,17 +302,17 @@ cdef double[:,:] _calcMarkovMatrix(double[:,:] RMSD, double[:] epsilons, int N):
 
 	for i in range(N):
 		for j in range(N):
-			K[i][j] = exp( (-RMSD[i][j]*RMSD[i][j]) / (2*epsilons[i]*epsilons[j]) )
-			D[i] += K[i][j]
+			K[i, j] = exp( (-RMSD[i, j]*RMSD[i, j]) / (2*epsilons[i]*epsilons[j]) )
+			D[i] += K[i, j]
 
 	for i in range(N):
 		for j in range(N):
-			Ktilda[i][j] = K[i][j]/sqrt(D[i]*D[j])
-			Dtilda[i] += Ktilda[i][j]
+			Ktilda[i, j] = K[i, j]/sqrt(D[i]*D[j])
+			Dtilda[i] += Ktilda[i, j]
 
 	for i in range(N):
 		for j in range(N):
-			P[i][j] = Ktilda[i][j]/Dtilda[i]
+			P[i, j] = Ktilda[i, j]/Dtilda[i]
 
 	np.savetxt('output/K.txt', K, fmt='%8.3f')
 	np.savetxt('output/D.txt', D, fmt='%8.3f')
