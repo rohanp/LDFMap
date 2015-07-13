@@ -31,6 +31,8 @@ def calcMarkovMatrix(RMSD, epsilons):
 		returns the MxM Markov transition matrix, which gives the transitional
 		probability between any two structures.
 	"""
+def main(filename, num_atoms, num_models):
+        """ Runs all the above methods and saves their results in output/ """
 ```
 
 # Example Usage:
