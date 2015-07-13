@@ -33,7 +33,7 @@ def PDBParser(filename, num_atoms, num_models):
 			#columns 33 to 56 contain the xyz coordinates
 			coord_list.extend(line[33:56].split())
 
-	coords = np.array(map(float, coord_list))
+	coords = np.array( list(map(float, coord_list)) )
 	try:
 		coords = np.reshape(coords, (num_models, num_atoms * 3))
 	except ValueError:
@@ -94,32 +94,41 @@ cdef double _calcEpsilon(int xi, RMSD, double[:] possible_epsilons, float cutoff
 	cdef:
 		int i, j, dim
 		long a
-		double[:,:] eigenvals_view
-		long[:,:] status_vectors_view
-		long[:] local_dim_view
+		double[:,:] eigenvals
+		long[:,:] status_vectors
+		long[:] local_dim
+		double[:,:] noise_eigenvals
 
-	eigenvals_view = _calcMDS(xi, RMSD, possible_epsilons)
+	eigenvals = _calcMDS(xi, RMSD, possible_epsilons)
 
 	#if there was error in _calcStatusVectors, it returns -1
-	if eigenvals_view[0, 0] == -1:
+	if eigenvals[0, 0] == -1:
 		return possible_epsilons[1]
 
-	status_vectors_view = _calcStatusVectors( np.asarray(eigenvals_view) )
+	status_vectors = _calcStatusVectors( np.asarray(eigenvals) )
 
 	#if there was error in _calcStatusVectors, it returns -1
-	if status_vectors_view[0, 0] == -1:
+	if status_vectors[0, 0] == -1:
 		return  possible_epsilons[1]
 
-	local_dim_view = np.zeros(status_vectors_view.shape[0], dtype=long) # len = 3
+	local_dim = np.zeros(status_vectors.shape[0], dtype=long) # len = 3
 
-	for e in range(status_vectors_view.shape[0]):
-		local_dim_view[e] = _calcIntrinsicDim(status_vectors_view[e,:])
+	for e in range(status_vectors.shape[0]):
+		local_dim[e] = _calcIntrinsicDim(status_vectors[e,:])
+
+
+	noise_eigenvals = np.zeros((eigenvals.shape[0], eigenvals.shape[1] - np.min(local_dim)))
+
+	for e in range(noise_eigenvals.shape[0]):
+		for i in range(noise_eigenvals.shape[1]):
+			if local_dim[e] <= i:
+				noise_eigenvals[e, i - local_dim[e]] = eigenvals[e,i]  
 
 	with nogil:
-		for dim in range(local_dim_view[e], eigenvals_view.shape[1]):
-			for e in range(eigenvals_view.shape[0]):
-				for i in range(dim, eigenvals_view.shape[1]):
-					if cutoff < _derivative(eigenvals_view[:,i], possible_epsilons, e):
+		for dim in range(noise_eigenvals.shape[1]):
+			for e in range(noise_eigenvals.shape[0]):
+				for i in range(dim, noise_eigenvals.shape[1]):
+					if cutoff < _derivative(noise_eigenvals[:,i], possible_epsilons, e):
 						break
 				else:
 					return possible_epsilons[e]

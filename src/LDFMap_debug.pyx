@@ -135,42 +135,50 @@ cdef double _calcEpsilon(int xi, RMSD, double[:] possible_epsilons, float cutoff
 		int i, j, dim
 		long a
 		double[:,:] eigenvals_view
-		long[:,:] status_vectors_view
-		long[:] local_dim_view
+		long[:,:] status_vectors
+		long[:] local_dim
+		double[:,:] noise_eigenvals
 
 	print("----- calculating eigenvalues")
 	eigenvals_view = _calcMDS(xi, RMSD, possible_epsilons)
 
-	if eigenvals_view[0][0] == -1:
+	if eigenvals_view[0, 0] == -1:
 		return possible_epsilons[1]
 
 	print("----- calculating status vectors")
-	status_vectors_view = _calcStatusVectors( np.asarray(eigenvals_view) )
+	status_vectors = _calcStatusVectors( np.asarray(eigenvals_view) )
 
 	#if there was error in _calcStatusVectors, returns -1
-	if status_vectors_view[0][0] == -1:
+	if status_vectors[0, 0] == -1:
 		return  possible_epsilons[1]
 
-	local_dim_view = np.zeros(status_vectors_view.shape[0], dtype=long) # len = 3
+	local_dim = np.zeros(status_vectors.shape[0], dtype=long) # len = 3
 
 	print("----- calculating local intrinsic dimensionality")
-	for e in range(status_vectors_view.shape[0]):
-		local_dim_view[e] = _calcIntrinsicDim(status_vectors_view[e,:])
+	for e in range(status_vectors.shape[0]):
+		local_dim[e] = _calcIntrinsicDim(status_vectors[e,:])
 
-	if xi % 10 == 0:
-		f = open("Output/epsilon_{0}_data".format(xi), 'w')
-		f.write("Epsilon {0} \n".format(xi))
-		f.write("Eigenvalues: \n {0} \n\n".format( np.array_str(np.asarray(eigenvals_view))) )
-		f.write("Status Vectors: \n {0} \n\n".format( np.array_str(np.asarray(status_vectors_view))) )
-		f.write("Local Dim: \n {0} \n".format( np.array_str(np.asarray(local_dim_view))) )
+	noise_eigenvals = np.zeros((eigenvals_view.shape[0], eigenvals_view.shape[1] - np.min(local_dim)))
+
+	for e in range(noise_eigenvals.shape[0]):
+		for i in range(noise_eigenvals.shape[1]):
+			if local_dim[e] <= i:
+				noise_eigenvals[e, i - local_dim[e]] = eigenvals_view[e,i]  
 
 	print("----- calculating epsilon")
-	for dim in range(local_dim_view[e], eigenvals_view.shape[1]):
-		for e in range(eigenvals_view.shape[0]):
-			for i in range(dim, eigenvals_view.shape[1]):
-				if cutoff < _derivative(eigenvals_view[:,i], possible_epsilons, e):
+	for dim in range(noise_eigenvals.shape[1]):
+		for e in range(noise_eigenvals.shape[0]):
+			for i in range(dim, noise_eigenvals.shape[1]):
+				if cutoff < _derivative(noise_eigenvals[:,i], possible_epsilons, e):
 					break
 			else:
+				if xi % 10 == 0:
+					f = open("Output/epsilon_{0}_data".format(xi), 'w')
+					f.write("Epsilon {0} \n".format(xi))
+					f.write("Eigenvalues: \n {0} \n\n".format( np.array_str(np.asarray(eigenvals_view))) )
+					f.write("Status Vectors: \n {0} \n\n".format( np.array_str(np.asarray(status_vectors))) )
+					f.write("Local Dim: \n {0} \n\n".format( np.array_str(np.asarray(local_dim))) )
+					f.write("Epsilon Val: {0}".format(possible_epsilons[e]))
 				return possible_epsilons[e]
 
 	raise Exception("Did not reach convergence. Try increasing cutoff")
@@ -255,6 +263,7 @@ cpdef long[:,:] _calcStatusVectors(eigenvals):
 	try:
 		dsv = np.zeros(( sv.shape[0], sv.shape[1] - 5 ), dtype=long)
 	except ValueError:
+		return np.zeros(eigenvals.shape, dtype=long) - 1
 		raise Exception("""
 			Status Vector fewer than 5 elements. The non-debug version would
 			return the middle epsilon in this case. Try increasing the possible
