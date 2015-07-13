@@ -65,8 +65,8 @@ cdef _calcRMSDs(double[:,:] coords, long num_atoms, long num_models):
 	for i in range(num_models):
 		for j in range(i+1, num_models):
 			# '&' because rmsd is a C++ function that takes pointers
-			RMSD_view[i][j] = rmsd(num_atoms*3, &coords[i,0], &coords[j,0])
-			RMSD_view[j][i] = RMSD_view[i][j]
+			RMSD_view[i, j] = rmsd(num_atoms*3, &coords[i,0], &coords[j,0])
+			RMSD_view[j, i] = RMSD_view[i, j]
 
 	return RMSD
 
@@ -101,13 +101,13 @@ cdef double _calcEpsilon(int xi, RMSD, double[:] possible_epsilons, float cutoff
 	eigenvals_view = _calcMDS(xi, RMSD, possible_epsilons)
 
 	#if there was error in _calcStatusVectors, it returns -1
-	if eigenvals_view[0][0] == -1:
+	if eigenvals_view[0, 0] == -1:
 		return possible_epsilons[1]
 
 	status_vectors_view = _calcStatusVectors( np.asarray(eigenvals_view) )
 
 	#if there was error in _calcStatusVectors, it returns -1
-	if status_vectors_view[0][0] == -1:
+	if status_vectors_view[0, 0] == -1:
 		return  possible_epsilons[1]
 
 	local_dim_view = np.zeros(status_vectors_view.shape[0], dtype=long) # len = 3
@@ -152,7 +152,7 @@ cdef double[:,:] _calcMDS(int xi, RMSD, double[:] possible_epsilons):
 		A = np.linalg.svd( neighbors_matrix, compute_uv=False )
 
 		for j in range(A.shape[0]):
-			eigenvals_view[i][j] = A[j]*A[j]
+			eigenvals_view[i, j] = A[j]*A[j]
 
 	return eigenvals_view[:,:max_neighbors]
 
@@ -184,7 +184,7 @@ cdef long[:,:] _calcStatusVectors(eigenvals):
 	#status vector = gap between eigenvalues
 	sv = eigenvals[:, :eigenvals.shape[1] - 1] - eigenvals[:, 1:] 
 	sv_view = sv
-	svx2 = sv*2
+	svx2 = sv * 2
 	svx2_view = svx2
 
 	try:
@@ -198,9 +198,9 @@ cdef long[:,:] _calcStatusVectors(eigenvals):
 	with nogil:
 		for e in range( sv_view.shape[0] ):
 			for i in range( sv_view.shape[1] - 5 ):
-				if sv_view[e][i] > svx2_view[e][i+1] and sv_view[e][i] > svx2_view[e][i+2] \
-				and sv_view[e][i] > svx2_view[e][i+3] and sv_view[e][i] > svx2_view[e][i+4]:
-					dsv[e][i] = 1
+				if sv_view[e, i] > svx2_view[e, i+1] and sv_view[e, i] > svx2_view[e, i+2] \
+				and sv_view[e, i] > svx2_view[e, i+3] and sv_view[e, i] > svx2_view[e, i+4]:
+					dsv[e, i] = 1
 
 	return dsv
 
@@ -235,17 +235,17 @@ cdef double[:,:] _calcMarkovMatrix(double[:,:] RMSD, double[:] epsilons, int N):
 	with nogil:
 		for i in range(N):
 			for j in range(N):
-				K[i][j] = exp( (-RMSD[i][j]*RMSD[i][j]) / (2*epsilons[i]*epsilons[j]) )
-				D[i] += K[i][j]
+				K[i, j] = exp( (-RMSD[i, j]*RMSD[i, j]) / (2*epsilons[i]*epsilons[j]) )
+				D[i] += K[i, j]
 
 		for i in range(N):
 			for j in range(N):
-				Ktilda[i][j] = K[i][j]/sqrt(D[i]*D[j])
-				Dtilda[i] += Ktilda[i][j]
+				Ktilda[i, j] = K[i, j]/sqrt(D[i]*D[j])
+				Dtilda[i] += Ktilda[i, j]
 
 		for i in range(N):
 			for j in range(N):
-				P[i][j] = Ktilda[i][j]/Dtilda[i]
+				P[i, j] = Ktilda[i, j]/Dtilda[i]
 
 	return P
 
