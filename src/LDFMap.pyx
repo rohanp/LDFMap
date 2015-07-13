@@ -119,12 +119,13 @@ cdef double _calcEpsilon(int xi, RMSD, double[:] possible_epsilons, float cutoff
 
 	noise_eigenvals = np.zeros((eigenvals.shape[0], eigenvals.shape[1] - np.min(local_dim)))
 
-	for e in range(noise_eigenvals.shape[0]):
-		for i in range(noise_eigenvals.shape[1]):
-			if local_dim[e] <= i:
-				noise_eigenvals[e, i - local_dim[e]] = eigenvals[e,i]  
-
 	with nogil:
+	
+		for e in range(noise_eigenvals.shape[0]):
+			for i in range(noise_eigenvals.shape[1]):
+				if local_dim[e] <= i:
+					noise_eigenvals[e, i - local_dim[e]] = eigenvals[e,i]  
+
 		for dim in range(noise_eigenvals.shape[1]):
 			for e in range(noise_eigenvals.shape[0]):
 				for i in range(dim, noise_eigenvals.shape[1]):

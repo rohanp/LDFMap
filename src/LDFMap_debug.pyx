@@ -160,6 +160,7 @@ cdef double _calcEpsilon(int xi, RMSD, double[:] possible_epsilons, float cutoff
 
 	noise_eigenvals = np.zeros((eigenvals_view.shape[0], eigenvals_view.shape[1] - np.min(local_dim)))
 
+	#take just the noise eigenvalues, align them, and add zeros to end to make equal length
 	for e in range(noise_eigenvals.shape[0]):
 		for i in range(noise_eigenvals.shape[1]):
 			if local_dim[e] <= i:
@@ -179,6 +180,7 @@ cdef double _calcEpsilon(int xi, RMSD, double[:] possible_epsilons, float cutoff
 					f.write("Status Vectors: \n {0} \n\n".format( np.array_str(np.asarray(status_vectors))) )
 					f.write("Local Dim: \n {0} \n\n".format( np.array_str(np.asarray(local_dim))) )
 					f.write("Epsilon Val: {0}".format(possible_epsilons[e]))
+					
 				return possible_epsilons[e]
 
 	raise Exception("Did not reach convergence. Try increasing cutoff")
@@ -263,7 +265,7 @@ cpdef long[:,:] _calcStatusVectors(eigenvals):
 	try:
 		dsv = np.zeros(( sv.shape[0], sv.shape[1] - 5 ), dtype=long)
 	except ValueError:
-		return np.zeros(eigenvals.shape, dtype=long) - 1
+		#return np.zeros(eigenvals.shape, dtype=long) - 1
 		raise Exception("""
 			Status Vector fewer than 5 elements. The non-debug version would
 			return the middle epsilon in this case. Try increasing the possible
