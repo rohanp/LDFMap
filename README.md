@@ -1,5 +1,5 @@
 # What is this?
-A fast, Cython implementation of the [Locally Scaled Diffusion Map](http://rohanp.io/MakingSenseOfBigMolecularData.pdf) 
+A fast, Cython implementation of the Locally Scaled Diffusion Map
 dimensionality reduction technique intended for use in computational biology.
 
 # Installation
