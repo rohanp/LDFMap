@@ -70,18 +70,18 @@ cdef _calcRMSDs(double[:,:] coords, long num_atoms, long num_models):
 
 	return RMSD
 
-def calcEpsilons(RMSD, cutoff = 0.03):
+def calcEpsilons(RMSD, cutoff = 0.03, prints=False):
 	""" Takes RMSD matrix and optional cutoff parameter and implements the 
 		algorithm described in Clementi et al. to estimate the distance around
 		each model which can be considered locally flat. Returns an array of 
 		length M of these distances.
 	"""
 
-	print("Max RMSD: {0}".format(np.max(RMSD)))
+	print("Max RMSD: {0}".format(np.max(RMSD))) if prints else None
 	epsilons = np.ones(RMSD.shape[0])
 
 	for xi in range(RMSD.shape[0]):
-		print("On epsilon {0}".format(xi))
+		print("On epsilon {0}".format(xi)) if prints else None
 		epsilons[xi] = _calcEpsilon(xi, RMSD, cutoff)
 
 	return epsilons
@@ -133,7 +133,7 @@ cpdef double _calcEpsilon(int xi, RMSD, float cutoff) except? 1:
 				else:
 					return possible_epsilons[e]
 
-	raise Exception("ERROR: Did not reach convergence. Try increasing cutoff")
+	raise Exception("ERROR: Did not reach convergence on epsilon {0}. Try increasing cutoff".format(xi))
 
 cdef double[:,:] _calcMDS(int xi, RMSD, double[:] possible_epsilons):
 	cdef:
@@ -275,7 +275,7 @@ def main(filename, num_atoms, num_models):
 
 	t0 = time()
 	print("Calculating epsilons")
-	epsilons = calcEpsilons(RMSD)
+	epsilons = calcEpsilons(RMSD, prints=True)
 	print("Calculated epsilons in {0} seconds".format(round(time()-start,3)))	
 	print("Saving epsilons to Output/epsilons.txt")
 	np.savetxt('Output/epsilons.txt', epsilons)

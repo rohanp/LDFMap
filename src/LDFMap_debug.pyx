@@ -18,7 +18,7 @@ from libc.math cimport sqrt, exp
 np.set_printoptions(precision=3, threshold=2000, suppress=True)
 
 cdef extern from "rmsd.h":
-	double rmsd(int n, double* x, double* y)
+	double rmsd(long n, double* x, double* y)
 
 def main(filename, num_atoms, num_models):
 	start = time()
@@ -104,7 +104,7 @@ cdef _calcRMSD(double[:,:] coords, long num_atoms, long num_models):
 		if i % 10 == 0:
 			print("on RMSD row {0}".format(i))
 		for j in range(i+1, num_models):
-			# '&' because rmsd is a C++ function that takes pointers
+			# '&' because rmsd is a C++ function that takes polongers
 			RMSD_view[i, j] = rmsd(num_atoms*3, &coords[i,0], &coords[j,0])
 			RMSD_view[j, i] = RMSD_view[i, j]
 
@@ -126,9 +126,9 @@ def calcEpsilons(RMSD, cutoff = 0.03):
 
 	return epsilons
 
-cpdef double _calcEpsilon(int xi, RMSD, float cutoff):
+cpdef double _calcEpsilon(long xi, RMSD, float cutoff):
 	cdef:
-		int i, j, dim
+		long i, j, dim
 		double[:,:] eigenvals
 		long[:,:] status_vectors
 		long[:] local_dim
@@ -154,9 +154,9 @@ cpdef double _calcEpsilon(int xi, RMSD, float cutoff):
 
 	local_dim = np.zeros(status_vectors.shape[0], dtype=long) # len = 3
 
-	print("----- calculating local intrinsic dimensionality")
+	print("----- calculating local longrinsic dimensionality")
 	for e in range(status_vectors.shape[0]):
-		local_dim[e] = _calcIntrinsicDim(status_vectors[e,:])
+		local_dim[e] = _calclongrinsicDim(status_vectors[e,:])
 
 	noise_eigenvals = np.zeros((eigenvals.shape[0], eigenvals.shape[1] - np.min(local_dim)))
 
@@ -189,13 +189,13 @@ def writeOutFiles(**args):
 	f.write("Epsilon Number: {0} \n\n".format(args['e']))
 	f.write("Epsilon Val: {0}".format(args['possible_epsilons'][args['e']]))
 
-cpdef double[:,:] _calcMDS(int xi, RMSD, double[:] possible_epsilons):
+cpdef double[:,:] _calcMDS(long xi, RMSD, double[:] possible_epsilons):
 	cdef:
 		double[:] A
 		double[:,:] neighbors_matrix
 		double[:,:] eigenvals_view = np.zeros( (possible_epsilons.shape[0], RMSD.shape[1]) ) 
-		int i, j
-		int max_neighbors = 0
+		long i, j
+		long max_neighbors = 0
 
 	for i, e in enumerate(possible_epsilons):
 		#find indexes of all neighbors
@@ -220,7 +220,7 @@ cpdef double[:,:] _calcMDS(int xi, RMSD, double[:] possible_epsilons):
 	return eigenvals_view[:,:max_neighbors]
 
 
-cdef long _calcIntrinsicDim(long[:] sv) except? 1: #sv = status vector
+cdef long _calclongrinsicDim(long[:] sv) except? 1: #sv = status vector
 	#TODO: This method can made more efficient by remoiving redundent checking.
 	#		Would be tricky and involve lots of if statements, probably not worth.
 
@@ -261,7 +261,7 @@ cdef long _calcIntrinsicDim(long[:] sv) except? 1: #sv = status vector
 cpdef long[:,:] _calcStatusVectors(eigenvals):
 	cdef:
 		double[:,:] sv_view, svx2_view
-		int e, i
+		long e, i
 		cdef long[:,:] dsv
 
 	#status vector = gap between eigenvalues
@@ -309,9 +309,9 @@ def calcMarkovMatrix(RMSD, epsilons):
 
 	return np.asarray( _calcMarkovMatrix(RMSD, epsilons, RMSD.shape[0]) )
 
-cdef double[:,:] _calcMarkovMatrix(double[:,:] RMSD, double[:] epsilons, int N):	
+cdef double[:,:] _calcMarkovMatrix(double[:,:] RMSD, double[:] epsilons, long N):	
 	cdef: 
-		int i, j
+		long i, j
 		#all are memoryviews
 		double[:] D = np.zeros(N)
 		double[:] Dtilda = np.zeros(N)

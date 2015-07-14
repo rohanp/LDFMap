@@ -5,7 +5,7 @@ dimensionality reduction technique intended for use in computational biology.
 # Installation
 Simply download this repo, move "LDFMap.so" to your project directory and `import LDFMap`. 
 
-The debug version has type/overflow checks, raises exceptions, has print statements showing progress, can be profiled, (all at the cost of speed), and is reccomended if the main program is giving errors. Only Python 2.x is currently supported.
+The debug version has type/overflow checks, raises exceptions, has print statements showing progress, can be profiled, (all at the cost of speed), and is reccomended if the main program is giving errors. Only Python 3.x is supported.
 
 # Public Methods
 ```cython
