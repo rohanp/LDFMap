@@ -70,7 +70,8 @@ def PDBParser(filename, num_atoms, num_models):
 			#columns 33 to 56 contain the xyz coordinates
 			coord_list.extend(line[33:56].split())
 
-	coords = np.array(map(float, coord_list))
+	coords = np.array(coord_list, dtype=float)
+
 	try:
 		coords = np.reshape(coords, (num_models, num_atoms * 3))
 	except ValueError:
@@ -220,11 +221,11 @@ cpdef double[:,:] _calcMDS(long xi, RMSD, double[:] possible_epsilons):
 	return eigenvals_view[:,:max_neighbors]
 
 
-cdef long _calclongrinsicDim(long[:] sv) except? 1: #sv = status vector
+cdef long _calclongrinsicDim(long[:] sv): #sv = status vector
 	#TODO: This method can made more efficient by remoiving redundent checking.
 	#		Would be tricky and involve lots of if statements, probably not worth.
 
-	cdef long i
+	cdef long i 
 
 	# * 1 1 0 0 0 * in status vectors marks the separation between noise and non-noise
 	for i in range(2, sv.shape[0] - 3):

@@ -5,7 +5,7 @@
 """ A Python/Cython implementation of the Locally-Scaled Diffusion Map 
 	Dimensionality Reduction Technique. 
 """
-__author__ = "Rohan Pandit"
+__author__ = "Rohan Pandit" 
 
 import numpy as np
 cimport numpy as np
@@ -33,7 +33,7 @@ def PDBParser(filename, num_atoms, num_models):
 			#columns 33 to 56 contain the xyz coordinates
 			coord_list.extend(line[33:56].split())
 
-	coords = np.array( list(map(float, coord_list)) )
+	coords = np.array(coord_list, dtype=float)
 	try:
 		coords = np.reshape(coords, (num_models, num_atoms * 3))
 	except ValueError:
@@ -86,7 +86,7 @@ def calcEpsilons(RMSD, cutoff = 0.03, prints=False):
 
 	return epsilons
 
-cpdef double _calcEpsilon(int xi, RMSD, float cutoff) except? 1:
+cpdef double _calcEpsilon(int xi, RMSD, float cutoff):
 	cdef:
 		int i, j, dim
 		double[:,:] eigenvals
