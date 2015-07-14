@@ -126,7 +126,7 @@ def calcEpsilons(RMSD, cutoff = 0.03):
 
 	return epsilons
 
-cdef double _calcEpsilon(int xi, RMSD, float cutoff) except? 1:
+cpdef double _calcEpsilon(int xi, RMSD, float cutoff):
 	cdef:
 		int i, j, dim
 		double[:,:] eigenvals
@@ -173,18 +173,20 @@ cdef double _calcEpsilon(int xi, RMSD, float cutoff) except? 1:
 				if cutoff < _derivative(noise_eigenvals[:,i], possible_epsilons, e):
 					break
 			else:
+				print(dim)
 				writeOutFiles(**locals())
 				return possible_epsilons[e]
 
 	raise Exception("Did not reach convergence. Try increasing cutoff")
 
 def writeOutFiles(**args):
-	f = open("Output/epsilon_{0}_data".format(args['xi']), 'w')
+	f = open("output/extra_data/epsilon_{0}_data".format(args['xi']), 'w')
 	f.write("Epsilon {0} \n\n".format(args['xi']))
 	f.write("Possible Epsilons {0}\n\n".format(np.asarray(args['possible_epsilons'])))
 	f.write("Eigenvalues: \n {0} \n\n".format(np.array_str(np.asarray(args['eigenvals']))))
 	f.write("Status Vectors: \n {0} \n\n".format(np.array_str(np.asarray(args['status_vectors']))))
 	f.write("Local Dim: \n {0} \n\n".format(np.array_str(np.asarray(args['local_dim']))))
+	f.write("Epsilon Number: {0} \n\n".format(args['e']))
 	f.write("Epsilon Val: {0}".format(args['possible_epsilons'][args['e']]))
 
 cpdef double[:,:] _calcMDS(int xi, RMSD, double[:] possible_epsilons):
@@ -245,7 +247,7 @@ cdef long _calcIntrinsicDim(long[:] sv) except? 1: #sv = status vector
 	for i in range(1, sv.shape[0]):
 		if sv[i] == 0:
 			return i 
-			
+
 	print( np.asarray(sv) )
 	raise Exception(""" 
 		No noise non-noise separation. The non-debug version would

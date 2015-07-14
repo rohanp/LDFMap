@@ -86,7 +86,7 @@ def calcEpsilons(RMSD, cutoff = 0.03):
 
 	return epsilons
 
-cdef double _calcEpsilon(int xi, RMSD, float cutoff) except? 1:
+cpdef double _calcEpsilon(int xi, RMSD, float cutoff) except? 1:
 	cdef:
 		int i, j, dim
 		double[:,:] eigenvals
