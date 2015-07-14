@@ -27,3 +27,4 @@ setup(
    							
    	)
 
+os.system("cp LDFMap.so ..")

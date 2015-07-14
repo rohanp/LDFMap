@@ -77,27 +77,26 @@ def calcEpsilons(RMSD, cutoff = 0.03):
 		length M of these distances.
 	"""
 
-	max_epsilon = np.max(RMSD)
-	print("Max RMSD: {0}".format(max_epsilon))
-	possible_epsilons = np.array([(3./7.)*max_epsilon, (1./2.)*max_epsilon, (4./7.)*max_epsilon])
+	print("Max RMSD: {0}".format(np.max(RMSD)))
 	epsilons = np.ones(RMSD.shape[0])
-
-	print("Possible Epsilons: {0}".format(possible_epsilons))
 
 	for xi in range(RMSD.shape[0]):
 		print("On epsilon {0}".format(xi))
-		epsilons[xi] = _calcEpsilon(xi, RMSD, possible_epsilons, cutoff)
+		epsilons[xi] = _calcEpsilon(xi, RMSD, cutoff)
 
 	return epsilons
 
-cdef double _calcEpsilon(int xi, RMSD, double[:] possible_epsilons, float cutoff):
+cdef double _calcEpsilon(int xi, RMSD, float cutoff) except? 1:
 	cdef:
 		int i, j, dim
-		long a
 		double[:,:] eigenvals
 		long[:,:] status_vectors
 		long[:] local_dim
 		double[:,:] noise_eigenvals
+		double[:] possible_epsilons
+
+	max_epsilon = np.max(RMSD[xi])
+	possible_epsilons = np.array([(3./7.)*max_epsilon, (1./2.)*max_epsilon, (4./7.)*max_epsilon])
 
 	eigenvals = _calcMDS(xi, RMSD, possible_epsilons)
 
@@ -120,7 +119,7 @@ cdef double _calcEpsilon(int xi, RMSD, double[:] possible_epsilons, float cutoff
 	noise_eigenvals = np.zeros((eigenvals.shape[0], eigenvals.shape[1] - np.min(local_dim)))
 
 	with nogil:
-	
+
 		for e in range(noise_eigenvals.shape[0]):
 			for i in range(noise_eigenvals.shape[1]):
 				if local_dim[e] <= i:

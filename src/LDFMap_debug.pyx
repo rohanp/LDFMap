@@ -40,7 +40,7 @@ def main(filename, num_atoms, num_models):
 	epsilons = calcEpsilons(RMSD)
 	print("Calculated epsilons in {0} seconds".format(round(time()-start,3)))	
 	print("Saving epsilons to output/epsilons.txt")
-	np.savetxt('output/epsilons.txt', epsilons)
+	np.savetxt('output/epsilons.txt', epsilons, fmt="%8.3f")
 
 	print(epsilons)
 
@@ -49,7 +49,7 @@ def main(filename, num_atoms, num_models):
 	print(P)
 	print("Completed transition matrix in {0} seconds".format(round(time()-t0,3)))
 	print("Saving output to output/markov.txt")
-	np.savetxt('output/markov.txt', P)
+	np.savetxt('output/markov.txt', P, fmt="%8.3f")
 
 	print("Done! Total time: {0} seconds".format(round(time() - start, 3)))
 
@@ -117,36 +117,36 @@ def calcEpsilons(RMSD, cutoff = 0.03):
 		length M of these distances.
 	"""
 
-	max_epsilon = np.max(RMSD)
-	print("Max RMSD: {0}".format(max_epsilon))
-	possible_epsilons = np.array([(3./7.)*max_epsilon, (1./2.)*max_epsilon, (4./7.)*max_epsilon])
+	print("Max RMSD: {0}".format(np.max(RMSD)))
 	epsilons = np.ones(RMSD.shape[0])
-
-	print("Possible Epsilons: {0}".format(possible_epsilons))
 
 	for xi in range(RMSD.shape[0]):
 		print("On epsilon {0}".format(xi))
-		epsilons[xi] = _calcEpsilon(xi, RMSD, possible_epsilons, cutoff)
+		epsilons[xi] = _calcEpsilon(xi, RMSD, cutoff)
 
 	return epsilons
 
-cdef double _calcEpsilon(int xi, RMSD, double[:] possible_epsilons, float cutoff) except? 1:
+cdef double _calcEpsilon(int xi, RMSD, float cutoff) except? 1:
 	cdef:
 		int i, j, dim
-		long a
-		double[:,:] eigenvals_view
+		double[:,:] eigenvals
 		long[:,:] status_vectors
 		long[:] local_dim
 		double[:,:] noise_eigenvals
+		double[:] possible_epsilons
+
+	max_epsilon = np.max(RMSD[xi])
+	possible_epsilons = np.array([(3./7.)*max_epsilon, (1./2.)*max_epsilon, (4./7.)*max_epsilon])
 
 	print("----- calculating eigenvalues")
-	eigenvals_view = _calcMDS(xi, RMSD, possible_epsilons)
+	eigenvals = _calcMDS(xi, RMSD, possible_epsilons)
 
-	if eigenvals_view[0, 0] == -1:
+	#if there was error in _calcStatusVectors, returns -1
+	if eigenvals[0, 0] == -1:
 		return possible_epsilons[1]
 
 	print("----- calculating status vectors")
-	status_vectors = _calcStatusVectors( np.asarray(eigenvals_view) )
+	status_vectors = _calcStatusVectors( np.asarray(eigenvals) )
 
 	#if there was error in _calcStatusVectors, returns -1
 	if status_vectors[0, 0] == -1:
@@ -158,13 +158,13 @@ cdef double _calcEpsilon(int xi, RMSD, double[:] possible_epsilons, float cutoff
 	for e in range(status_vectors.shape[0]):
 		local_dim[e] = _calcIntrinsicDim(status_vectors[e,:])
 
-	noise_eigenvals = np.zeros((eigenvals_view.shape[0], eigenvals_view.shape[1] - np.min(local_dim)))
+	noise_eigenvals = np.zeros((eigenvals.shape[0], eigenvals.shape[1] - np.min(local_dim)))
 
 	#take just the noise eigenvalues, align them, and add zeros to end to make equal length
 	for e in range(noise_eigenvals.shape[0]):
 		for i in range(noise_eigenvals.shape[1]):
 			if local_dim[e] <= i:
-				noise_eigenvals[e, i - local_dim[e]] = eigenvals_view[e,i]  
+				noise_eigenvals[e, i - local_dim[e]] = eigenvals[e,i]  
 
 	print("----- calculating epsilon")
 	for dim in range(noise_eigenvals.shape[1]):
@@ -173,17 +173,19 @@ cdef double _calcEpsilon(int xi, RMSD, double[:] possible_epsilons, float cutoff
 				if cutoff < _derivative(noise_eigenvals[:,i], possible_epsilons, e):
 					break
 			else:
-				if xi % 10 == 0:
-					f = open("Output/epsilon_{0}_data".format(xi), 'w')
-					f.write("Epsilon {0} \n".format(xi))
-					f.write("Eigenvalues: \n {0} \n\n".format( np.array_str(np.asarray(eigenvals_view))) )
-					f.write("Status Vectors: \n {0} \n\n".format( np.array_str(np.asarray(status_vectors))) )
-					f.write("Local Dim: \n {0} \n\n".format( np.array_str(np.asarray(local_dim))) )
-					f.write("Epsilon Val: {0}".format(possible_epsilons[e]))
-					
+				writeOutFiles(**locals())
 				return possible_epsilons[e]
 
 	raise Exception("Did not reach convergence. Try increasing cutoff")
+
+def writeOutFiles(**args):
+	f = open("Output/epsilon_{0}_data".format(args['xi']), 'w')
+	f.write("Epsilon {0} \n\n".format(args['xi']))
+	f.write("Possible Epsilons {0}\n\n".format(np.asarray(args['possible_epsilons'])))
+	f.write("Eigenvalues: \n {0} \n\n".format(np.array_str(np.asarray(args['eigenvals']))))
+	f.write("Status Vectors: \n {0} \n\n".format(np.array_str(np.asarray(args['status_vectors']))))
+	f.write("Local Dim: \n {0} \n\n".format(np.array_str(np.asarray(args['local_dim']))))
+	f.write("Epsilon Val: {0}".format(args['possible_epsilons'][args['e']]))
 
 cpdef double[:,:] _calcMDS(int xi, RMSD, double[:] possible_epsilons):
 	cdef:
@@ -240,6 +242,10 @@ cdef long _calcIntrinsicDim(long[:] sv) except? 1: #sv = status vector
 		if sv[i-1] and not sv[i] and not sv[i+1]:
 			return i
 
+	for i in range(1, sv.shape[0]):
+		if sv[i] == 0:
+			return i 
+			
 	print( np.asarray(sv) )
 	raise Exception(""" 
 		No noise non-noise separation. The non-debug version would
@@ -324,12 +330,6 @@ cdef double[:,:] _calcMarkovMatrix(double[:,:] RMSD, double[:] epsilons, int N):
 	for i in range(N):
 		for j in range(N):
 			P[i, j] = Ktilda[i, j]/Dtilda[i]
-
-	np.savetxt('output/K.txt', K, fmt='%8.3f')
-	np.savetxt('output/D.txt', D, fmt='%8.3f')
-	np.savetxt('output/Ktilda.txt', Ktilda, fmt='%8.3f')
-	np.savetxt('output/Dtilda.txt', Dtilda, fmt='%8.3f')
-	np.savetxt('output/P.txt', K, fmt='%8.3f')
 
 	print(np.sum(P))
 

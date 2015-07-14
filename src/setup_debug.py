@@ -22,3 +22,4 @@ setup(
    							
    	)
 
+os.system("cp LDFMap_debug.so ..")
