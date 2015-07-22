@@ -3,7 +3,7 @@
 #cython: cdivision_warnings=False, unraisable_tracebacks=False
 
 """ A Python/Cython implementation of the Locally-Scaled Diffusion Map 
-	Dimensionality Reduction Technique. 
+	Dimensionality Reduction Technique.  
 """
 __author__ = "Rohan Pandit" 
 
@@ -26,10 +26,9 @@ def PDBParser(filename, num_atoms, num_models):
 	coord_list = []
 
 	for line in f:
-		len_ = len(line)
 		if 'END' in line:
 			modelnum += 1
-		elif len_ == 79: 
+		elif 'ATOM' in line: 
 			#columns 33 to 56 contain the xyz coordinates
 			coord_list.extend(line[33:56].split())
 
@@ -39,17 +38,21 @@ def PDBParser(filename, num_atoms, num_models):
 	except ValueError:
 		raise Exception("""
 			Could not parse PDB file. Make sure your PDB file is 
-			formatted like the example, 'Input/Met-Enk.pdb' and 
+			formatted like the example, 'input/Met-Enk.pdb' and 
 			that you entered the correct values for num_atoms and 
-			num_models. 
-						""".replace('\t',''))
+			num_models.
+
+			Coodrinates read: {0}
+			Models read: {1}
+			Num atoms: {2}
+		""".replace('\t','').format(coords.shape[0], modelnum, coords.shape[0]/modelnum))
 
 	return coords
 
 def calcRMSDs(coords, num_atoms, num_models):
 	""" Takes coordinates from PDB parser and calculates pairwise least 
 		root-mean-squared distance between all models with given coordinates.
-		Returns MxM RMSD matrix.   
+		Returns MxM RMSD matrix.
 	"""
 
 	return _calcRMSDs(coords, num_atoms, num_models)
@@ -62,11 +65,12 @@ cdef _calcRMSDs(double[:,:] coords, long num_atoms, long num_models):
 	RMSD = np.zeros((num_models, num_models))
 	RMSD_view = RMSD
 
-	for i in range(num_models):
-		for j in range(i+1, num_models):
-			# '&' because rmsd is a C++ function that takes pointers
-			RMSD_view[i, j] = rmsd(num_atoms*3, &coords[i,0], &coords[j,0])
-			RMSD_view[j, i] = RMSD_view[i, j]
+	with nogil:
+		for i in range(num_models):
+			for j in range(i+1, num_models):
+				# '&' because rmsd is a C++ function that takes pointers
+				RMSD_view[i, j] = rmsd(num_atoms*3, &coords[i,0], &coords[j,0])
+				RMSD_view[j, i] = RMSD_view[i, j]
 
 	return RMSD
 
@@ -77,11 +81,12 @@ def calcEpsilons(RMSD, cutoff = 0.03, prints=False):
 		length M of these distances.
 	"""
 
-	print("Max RMSD: {0}".format(np.max(RMSD))) if prints else None
+	if prints: print("Max RMSD: {0}".format(np.max(RMSD)))
+
 	epsilons = np.ones(RMSD.shape[0])
 
 	for xi in range(RMSD.shape[0]):
-		print("On epsilon {0}".format(xi)) if prints else None
+		if not xi % 10: print("On Epsilon {0}".format(xi))  
 		epsilons[xi] = _calcEpsilon(xi, RMSD, cutoff)
 
 	return epsilons
@@ -112,13 +117,11 @@ cpdef double _calcEpsilon(int xi, RMSD, float cutoff):
 
 	local_dim = np.zeros(status_vectors.shape[0], dtype=long) # len = 3
 
-	for e in range(status_vectors.shape[0]):
-		local_dim[e] = _calcIntrinsicDim(status_vectors[e,:])
-
-
 	noise_eigenvals = np.zeros((eigenvals.shape[0], eigenvals.shape[1] - np.min(local_dim)))
 
 	with nogil:
+		for e in range(status_vectors.shape[0]):
+			local_dim[e] = _calcIntrinsicDim(status_vectors[e,:])
 
 		for e in range(noise_eigenvals.shape[0]):
 			for i in range(noise_eigenvals.shape[1]):
@@ -142,10 +145,12 @@ cdef double[:,:] _calcMDS(int xi, RMSD, double[:] possible_epsilons):
 		double[:,:] eigenvals_view = np.zeros( (possible_epsilons.shape[0], RMSD.shape[1]) ) 
 		int i, j
 		int max_neighbors = 0
+		double eps
 
-	for i, e in enumerate(possible_epsilons):
+	for i in range(possible_epsilons.shape[0]):
+		eps = possible_epsilons[i]
 		#find indexes of all neighbors
-		neighbors_idxs = np.where( RMSD[xi,:] <= e )[0]
+		neighbors_idxs = np.where( RMSD[xi,:] <= eps )[0]
 
 		#ERROR: no neighbors. insert a -1 so that calcEpsilon knows
 		#an error has occured and will return the middle epsilon.
@@ -166,22 +171,18 @@ cdef double[:,:] _calcMDS(int xi, RMSD, double[:] possible_epsilons):
 	return eigenvals_view[:,:max_neighbors]
 
 
-cdef long _calcIntrinsicDim(long[:] sv): #sv = status vector
+cdef long _calcIntrinsicDim(long[:] sv) nogil: #sv = status vector
 	cdef long i
+	# * 1 1 0 0 0 * in status vectors marks the separation between noise and non-noise
+	for i in range(2, sv.shape[0] - 3):
+		if sv[i-2] and sv[i-1] and not sv[i] and not sv[i+1] and not sv[i+2] and not sv[i+3]:
+			return i
 
-	with nogil:
-		# * 1 1 0 0 0 * in status vectors marks the separation between noise and non-noise
-		for i in range(2, sv.shape[0] - 3):
-			if sv[i-2] and sv[i-1] and not sv[i] and not sv[i+1] and not sv[i+2] and not sv[i+3]:
-				return i
-
-		# If last method did not find separation, the condition for separation must be more lenient
-		# * 1 0 0 0 * marks separation
-		for i in range(1, sv.shape[0] - 2):
-			if sv[i-1] and not sv[i] and not sv[i+1] and not sv[i+2]:
-				return i
-
-	print("No noise-non noise separation. Returning local dim = 1.")
+	# If last method did not find separation, the condition for separation must be more lenient
+	# * 1 0 0 0 * marks separation
+	for i in range(1, sv.shape[0] - 2):
+		if sv[i-1] and not sv[i] and not sv[i+1] and not sv[i+2]:
+			return i
 	return 1
 
 cdef long[:,:] _calcStatusVectors(eigenvals):
@@ -224,7 +225,7 @@ cdef inline double _derivative(double[:] eigenvals, double[:] epsilons, long e) 
 
 	return derivative
 
-def calcMarkovMatrix(RMSD, epsilons):
+def calcMarkov(RMSD, epsilons):
 	""" Takes the MxM RMSD matrix and the array of epsilons of length M,
 		returns the MxM Markov transition matrix
 	"""
@@ -249,41 +250,37 @@ cdef double[:,:] _calcMarkovMatrix(double[:,:] RMSD, double[:] epsilons, int N):
 
 		for i in range(N):
 			for j in range(N):
-				Ktilda[i, j] = K[i, j]/sqrt(D[i]*D[j])
+				Ktilda[i, j] = K[i, j] / sqrt(D[i]*D[j])
 				Dtilda[i] += Ktilda[i, j]
 
 		for i in range(N):
 			for j in range(N):
-				P[i, j] = Ktilda[i, j]/Dtilda[i]
+				P[i, j] = Ktilda[i, j] / Dtilda[i]
 
 	return P
+ 
+def calcEig(P):
+	eigenvals, eigenvecs = np.linalg.eig(P)
 
-def main(filename, num_atoms, num_models):
-	start = time()
+	#sort eigenvals/vecs
+	idxs = np.argsort(eigenvals)[::-1]
+	eigenvals = eigenvals[ idxs ]
+	eigenvecs = eigenvecs[:, idxs]
 
-	t0 = time()
-	print("Parsing file...")
-	coords = PDBParser(filename, num_atoms, num_models)
-	print("File Parsed in {0} seconds".format(round(time()-start,3)))
-	
-	t0 = time()
-	print("Calculating RMSD")
-	RMSD = calcRMSDs(coords, num_atoms, num_models)
-	print("Calculated RMSD in {0} seconds".format(round(time()-start,3)))
-	print("Saving RMSD to 'Output/RSMD.txt'")
-	np.savetxt('Output/RMSD.txt', RMSD, fmt='%8.3f')
+	return eigenvals, eigenvecs
 
-	t0 = time()
-	print("Calculating epsilons")
-	epsilons = calcEpsilons(RMSD, prints=True)
-	print("Calculated epsilons in {0} seconds".format(round(time()-start,3)))	
-	print("Saving epsilons to Output/epsilons.txt")
-	np.savetxt('Output/epsilons.txt', epsilons)
+def calcProj(P, eigenvecs):
+	return np.dot(P, eigenvecs)
 
-	t0 = time()
-	P = calcMarkovMatrix(RMSD, epsilons)
-	print("Completed transition matrix in {0} seconds".format(round(time()-t0,3)))
-	print("Saving output to Output/markov.txt")
-	np.savetxt('Output/markov.txt', P)
+def calcProj2(P, eigenvecs):
+	projections = np.zeros(P.shape)
 
-	print("Done! Total time: {0} seconds".format(round(time() - start, 3)))
+	for i in range(P.shape[0]):
+		for j in range(P.shape[1]):
+			projections[i, j] = np.dot( P[i,:], eigenvecs[:,j] )
+
+	return projections
+
+
+
+
