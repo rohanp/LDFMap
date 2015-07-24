@@ -36,6 +36,7 @@ def PDBParser(filename, num_atoms, num_models):
 	try:
 		coords = np.reshape(coords, (num_models, num_atoms * 3))
 	except ValueError:
+		coordnum = coords.shape[0]
 		raise Exception("""
 			Could not parse PDB file. Make sure your PDB file is 
 			formatted like the example, 'input/Met-Enk.pdb' and 
@@ -45,7 +46,7 @@ def PDBParser(filename, num_atoms, num_models):
 			Coodrinates read: {0}
 			Models read: {1}
 			Num atoms: {2}
-		""".replace('\t','').format(coords.shape[0], modelnum, coords.shape[0]/modelnum))
+		""".replace('\t','').format(coordnum, modelnum, coordnum/modelnum))
 
 	return coords
 
@@ -101,7 +102,7 @@ cpdef double _calcEpsilon(int xi, RMSD, float cutoff):
 		double[:] possible_epsilons
 
 	max_epsilon = np.max(RMSD[xi])
-	possible_epsilons = np.array([(3./7.)*max_epsilon, (1./2.)*max_epsilon, (4./7.)*max_epsilon])
+	possible_epsilons = np.array([3./7., 1./2., 4./7.]) * max_epsilon
 
 	eigenvals = _calcMDS(xi, RMSD, possible_epsilons)
 
@@ -117,12 +118,13 @@ cpdef double _calcEpsilon(int xi, RMSD, float cutoff):
 
 	local_dim = np.zeros(status_vectors.shape[0], dtype=long) # len = 3
 
-	noise_eigenvals = np.zeros((eigenvals.shape[0], eigenvals.shape[1] - np.min(local_dim)))
-
 	with nogil:
 		for e in range(status_vectors.shape[0]):
 			local_dim[e] = _calcIntrinsicDim(status_vectors[e,:])
 
+	noise_eigenvals = np.zeros((eigenvals.shape[0], eigenvals.shape[1] - np.min(local_dim)))
+
+	with nogil:
 		for e in range(noise_eigenvals.shape[0]):
 			for i in range(noise_eigenvals.shape[1]):
 				if local_dim[e] <= i:
@@ -136,7 +138,7 @@ cpdef double _calcEpsilon(int xi, RMSD, float cutoff):
 				else:
 					return possible_epsilons[e]
 
-	raise Exception("ERROR: Did not reach convergence on epsilon {0}. Try increasing cutoff".format(xi))
+	raise Exception("ERROR: Did not reach convergence on epsilon {0}.".format(xi))
 
 cdef double[:,:] _calcMDS(int xi, RMSD, double[:] possible_epsilons):
 	cdef:
@@ -260,6 +262,9 @@ cdef double[:,:] _calcMarkovMatrix(double[:,:] RMSD, double[:] epsilons, int N):
 	return P
  
 def calcEig(P):
+	""" Eigendecomposes the transition matrix and then sorts eigenvalues and
+		eigenvectors in decreasing order by eigenvalue, returns sorted versions.
+	""" 
 	eigenvals, eigenvecs = np.linalg.eig(P)
 
 	#sort eigenvals/vecs
@@ -270,16 +275,26 @@ def calcEig(P):
 	return eigenvals, eigenvecs
 
 def calcProj(P, eigenvecs):
-	return np.dot(P, eigenvecs)
+	""" Projects the transition matrix on to the eigenvectors, returns projection."""
+	return np.dot(P, eigenvecs.T)
 
-def calcProj2(P, eigenvecs):
-	projections = np.zeros(P.shape)
+def calcAccumVar(eigenvals):
+	""" Calculates accumulated variance captured by eigenvalues,
+		returns accumulated variance
+	"""
+	accVars = eigenvals[ 0 < eigenvals ] #only positive eigenvals (returns copy)
+	nevals = accVars.shape[0]
+	
+	for i in range(1, nevals):
+		previous = accVars[i-1]
+		accVars[i] += previous
+	
+	for i in range(0, nevals):
+		accVars[i] /= accVars[nevals-1]
+		accVars[i] *= 100.0
 
-	for i in range(P.shape[0]):
-		for j in range(P.shape[1]):
-			projections[i, j] = np.dot( P[i,:], eigenvecs[:,j] )
+	return accVars
 
-	return projections
 
 
 

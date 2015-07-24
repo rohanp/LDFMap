@@ -15,7 +15,7 @@ cimport numpy as np
 from time import time
 from libc.math cimport sqrt, exp
 from libc.stdlib cimport malloc, free 
-cimport scipy.linalg.cython_lapack as lapack
+#cimport scipy.linalg.cython_lapack as lapack
 from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
 
 np.set_printoptions(precision=3, threshold=2000, suppress=True)
@@ -396,40 +396,46 @@ np.set_printoptions(precision=3, threshold=2000, suppress=True)
 #	free(U_p)
 #	free(VT_p)
 
-cpdef svd(A_f, m, n):
-	cdef double* S_p
+#cpdef svd(double[:] A_f, int m, int n):
+#	cdef double* S_p
 
-	S_p = _svd(A_f, m, n)
+#	with nogil:
+#		S_p = _svd(A_f, m, n)
 
-	return <double[:min(m, n)]> S_p
+#	return <double[:min(m, n)]> S_p
 
-cdef double* _svd(double[:] A_f, int m, int n) nogil:
-	#TODO: generalize to rectangular A and dif jobs
-	cdef:
-		char jobu, jobvt
-		int i, lda, ldu, ldvt, lwork, info, size
-		double *S_p, *work_p, *U_p, *VT_p
+#cdef double* _svd(double[:] A_f, int m, int n) nogil:
+#	#TODO: generalize to rectangular A and dif jobs
+#	cdef:
+#		char jobu, jobvt
+#		int i, lda, ldu, ldvt, lwork, info, size
+#		double *S_p, *work_p, *U_p, *VT_p
 
-	jobu = 'N'
-	jobvt = 'N'
-	size = min(m,n)
-	lda = max(1, m)
-	ldu = m 
-	ldvt = n
-	lwork = max(1, 5 * size)
+#	jobu = 'N'
+#	jobvt = 'N'
+#	size = min(m,n)
+#	lda = max(1, m)
+#	ldu = m 
+#	ldvt = n
+#	lwork = max(1, 5 * size)
 	
-	U_p = <double *> malloc(sizeof(double) * ldu * ldu)
-	VT_p = <double *> malloc(sizeof(double) * ldvt * ldvt)
-	S_p = <double *> malloc(sizeof(double) * size)
-	work_p = <double *> malloc(sizeof(double) * lwork) 
+#	U_p = <double *> malloc(sizeof(double) * ldu * ldu)
+#	VT_p = <double *> malloc(sizeof(double) * ldvt * ldvt)
+#	S_p = <double *> malloc(sizeof(double) * size)
+#	work_p = <double *> malloc(sizeof(double) * lwork) 
 	
-	lapack.dgesvd(&jobu, &jobvt, &m, &n, &A_f[0], &lda, &S_p[0], &U_p[0],
-					&ldu, &VT_p[0], &ldvt, &work_p[0], &lwork, &info)
+#	lapack.dgesvd(&jobu, &jobvt, &m, &n, &A_f[0], &lda, &S_p[0], &U_p[0],
+#					&ldu, &VT_p[0], &ldvt, &work_p[0], &lwork, &info)
 
-	free(U_p)
-	free(VT_p)
-	free(work_p)
+#	free(U_p)
+#	free(VT_p)
+#	free(work_p)
 
-	return S_p
+#	return S_p
+
+cpdef svd(A):
+	return np.linalg.svd(A)
+
+	
 
 
