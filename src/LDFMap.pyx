@@ -247,7 +247,7 @@ cdef double[:,:] _calcMarkovMatrix(double[:,:] RMSD, double[:] epsilons, int N):
 	with nogil:
 		for i in range(N):
 			for j in range(N):
-				K[i, j] = exp( (-RMSD[i, j]*RMSD[i, j]) / (2*epsilons[i]*epsilons[j]) )
+				K[i, j] = exp( (-RMSD[i, j] * RMSD[i, j]) / (2*epsilons[i] * epsilons[j]) )
 				D[i] += K[i, j]
 
 		for i in range(N):
@@ -274,8 +274,10 @@ def calcEig(P):
 
 	return eigenvals, eigenvecs
 
+
 def calcProj(P, eigenvecs):
-	""" Projects the transition matrix on to the eigenvectors, returns projection."""
+	""" Projects the transition matrix on to the eigenvectors, returns projection.
+	"""
 	return np.dot(P, eigenvecs.T)
 
 def calcAccumVar(eigenvals):
