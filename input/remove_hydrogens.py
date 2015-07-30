@@ -1,10 +1,8 @@
 import sys
 
 infile = open(sys.argv[1], 'r')
-outfile = open('modified_'+sys.argv[1], 'w')
+outfile = open(sys.argv[1] + "_modified", 'w')
 
 for line in infile:
-	if len(line) == 79:
-		if line[77] == 'H':
-			continue
-	outfile.write(line)
+	if line.split()[-1] != 'H':
+		outfile.write(line)

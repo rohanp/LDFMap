@@ -17,8 +17,33 @@ cdef extern from "rmsd.h" nogil:
 	double rmsd(int n, double* x, double* y)
 
 def PDBParser(filename, num_atoms, num_models):
-	""" Takes PDB filename with M models and A atoms, returns Mx3A matrix
-		containing the XYZ coordinates of all atoms.
+	""" Parses PDB file for XYZ coordinates of all atoms in a format 
+		that can be used by `calcRMSDs`.
+
+		Parameters
+		----------
+		filename : str
+			Path to PDB file.
+		num_atoms : int
+		num_models : int
+
+		Returns
+		-------
+		array[float, float]
+			Contains the XYZ coordinates of all atoms. 
+			shape = (num_models, 3 * num_atoms)
+
+		Raises
+		------
+		ValueError
+			If the values of `num_atoms` and `num_models` are not
+			consistent with the contents in `filename`. 
+
+		Examples
+		--------
+		>>> coords = PDBParser("input/Met-Enk.pdb", 75, 180)
+		>>> RMSDs = calcRMSDs(coords, 75, 180)
+
 	"""
 
 	f = open(filename, 'r')
@@ -51,9 +76,28 @@ def PDBParser(filename, num_atoms, num_models):
 	return coords
 
 def calcRMSDs(coords, num_atoms, num_models):
-	""" Takes coordinates from PDB parser and calculates pairwise least 
-		root-mean-squared distance between all models with given coordinates.
-		Returns MxM RMSD matrix.
+	""" Calculates pairwise least root-mean-squared distance 
+		between all models.
+
+		Parameters
+		----------
+		coords : array[float, float]
+			Array of XYZ coordinates of all atoms in all models.
+			Should use `PDBParser` to create this array
+		num_atoms : int
+		num_models : int
+
+		Returns
+		-------
+		array[float]
+			Containing pairwise lRMSD between all models. 
+			shape = (`num_models`, `num_models`)
+
+		Examples
+		--------
+		>>> coords = PDBParser("input/Met-Enk.pdb", 75, 180)
+		>>> RMSDs = calcRMSDs(coords, 75, 180)
+		
 	"""
 
 	return _calcRMSDs(coords, num_atoms, num_models)
@@ -75,20 +119,45 @@ cdef _calcRMSDs(double[:,:] coords, long num_atoms, long num_models):
 
 	return RMSD
 
-def calcEpsilons(RMSD, cutoff = 0.03, prints=False):
-	""" Takes RMSD matrix and optional cutoff parameter and implements the 
-		algorithm described in Clementi et al. to estimate the distance around
-		each model which can be considered locally flat. Returns an array of 
-		length M of these distances.
+def calcEpsilons(RMSDs, cutoff = 0.03):
+	""" Implements algorithm described in Clementi et al. to estimate the 
+		distance around each model which can be considered locally flat.
+
+		Parameters
+		----------
+		RMSDs : array[float, float]
+			Containes pairwise leat root-mean-squared distances between
+			all models.
+		cutoff : float, optional
+			See Clementi et al.
+
+		Returns
+		-------
+		array[float]
+			Contains the epsilon value for each model, the distance 
+			around each model which can be considered locally flat.
+			shape = (`RMSD.shape[0]`,)
+
+		Notes
+		------
+		Squashes exceptions, uses print statements instead due to
+		common occurance of non-fatal exceptions.
+
+		References
+		----------
+		.. [1]  Rohrdanz M, Zheng W, Maggioni M, Clementi C (2011) 
+				Determination of reaction coordinates via locally 
+				scaled diffusion map. J Chem Phys 134: 124116.
+
 	"""
 
-	if prints: print("Max RMSD: {0}".format(np.max(RMSD)))
+	print("Max RMSD: {0}".format(np.max(RMSDs)))
 
-	epsilons = np.ones(RMSD.shape[0])
+	epsilons = np.ones(RMSDs.shape[0])
 
-	for xi in range(RMSD.shape[0]):
+	for xi in range(RMSDs.shape[0]):
 		if not xi % 10: print("On Epsilon {0}".format(xi))  
-		epsilons[xi] = _calcEpsilon(xi, RMSD, cutoff)
+		epsilons[xi] = _calcEpsilon(xi, RMSDs, cutoff)
 
 	return epsilons
 
@@ -106,14 +175,16 @@ cpdef double _calcEpsilon(int xi, RMSD, float cutoff):
 
 	eigenvals = _calcMDS(xi, RMSD, possible_epsilons)
 
-	#if there was error in _calcStatusVectors, it returns -1
+	#if there was error in _calcMDS, it returns -1
 	if eigenvals[0, 0] == -1:
+		print("Error in _calcMDS!")
 		return possible_epsilons[1]
 
 	status_vectors = _calcStatusVectors( np.asarray(eigenvals) )
 
 	#if there was error in _calcStatusVectors, it returns -1
 	if status_vectors[0, 0] == -1:
+		print("Error in _calcStatusVectors!")
 		return  possible_epsilons[1]
 
 	local_dim = np.zeros(status_vectors.shape[0], dtype=long) # len = 3
@@ -149,8 +220,7 @@ cdef double[:,:] _calcMDS(int xi, RMSD, double[:] possible_epsilons):
 		int max_neighbors = 0
 		double eps
 
-	for i in range(possible_epsilons.shape[0]):
-		eps = possible_epsilons[i]
+	for i, eps in enumerate(possible_epsilons):
 		#find indexes of all neighbors
 		neighbors_idxs = np.where( RMSD[xi,:] <= eps )[0]
 
@@ -162,6 +232,7 @@ cdef double[:,:] _calcMDS(int xi, RMSD, double[:] possible_epsilons):
 		#create RMSD matrix of just these neighbors
 		neighbors_matrix = RMSD[ neighbors_idxs, : ][ :, neighbors_idxs ]
 		
+		#to find out what shape the eigenvalue array should be
 		if max_neighbors < neighbors_idxs.shape[0]:
 			max_neighbors = neighbors_idxs.shape[0] 
 
@@ -227,12 +298,28 @@ cdef inline double _derivative(double[:] eigenvals, double[:] epsilons, long e) 
 
 	return derivative
 
-def calcMarkov(RMSD, epsilons):
-	""" Takes the MxM RMSD matrix and the array of epsilons of length M,
-		returns the MxM Markov transition matrix
+def calcMarkov(RMSDs, epsilons):
+	""" Calculates the Markov transition matrix, which contains the 
+		transitional probability between two states. Uses algorithm
+		from Clementi et al.
+
+		Parameters
+		----------
+		RMSDs : array[float, float]
+			Contains pairwise least root-mean-squared distances between
+			each model.
+		epsilons : array[float]
+			Contains the distances around each model that can be 
+			considered locally flat.
+
+		Returns 
+		-------
+		array[float, float]
+			Contains transitional probability between two given states.
+
 	"""
 
-	return np.asarray( _calcMarkovMatrix(RMSD, epsilons, RMSD.shape[0]) )
+	return np.asarray( _calcMarkovMatrix(RMSDs, epsilons, RMSDs.shape[0]) )
 
 cdef double[:,:] _calcMarkovMatrix(double[:,:] RMSD, double[:] epsilons, int N):	
 	cdef: 
@@ -264,6 +351,20 @@ cdef double[:,:] _calcMarkovMatrix(double[:,:] RMSD, double[:] epsilons, int N):
 def calcEig(P):
 	""" Eigendecomposes the transition matrix and then sorts eigenvalues and
 		eigenvectors in decreasing order by eigenvalue, returns sorted versions.
+
+		Parameters
+		----------
+		P : array[float, float]
+			Markov matrix, contains transitional probability between models.
+
+		Returns
+		-------
+		eigenvals : array[float]
+			Contains eigenvalues sorted in descending order.
+		eigenvalues : array[float, float]
+			Contains eigenvectors (in columns) corresponding
+			to each eigenvalue.
+
 	""" 
 	eigenvals, eigenvecs = np.linalg.eig(P)
 
@@ -277,12 +378,39 @@ def calcEig(P):
 
 def calcProj(P, eigenvecs):
 	""" Projects the transition matrix on to the eigenvectors, returns projection.
+
+		Parameters
+		----------
+		P : array[float, float]
+			Markov matrix, contains transitional probability between models.
+		eigenvecs : array[float, float]
+			Contains eigenvectors (in columns)
+
+		Returns
+		-------
+		array[float, float]
+			Projection of transition matrix onto eigenvectors
+			.. math:: PE_v^t 
+
+		Notes
+		-----
+		Eigenvectors MUST be in columns
+
 	"""
 	return np.dot(P, eigenvecs.T)
 
 def calcAccumVar(eigenvals):
-	""" Calculates accumulated variance captured by eigenvalues,
-		returns accumulated variance
+	""" Calculates accumulated variance captured by eigenvalues
+
+		Parameters
+		----------
+		eigenvals : array[float]
+			Contains eigenvalues sorted in descending order
+
+		Returns
+		-------
+		array[float]
+			Accumulated variance captured by eigenvalues
 	"""
 	accVars = eigenvals[ 0 < eigenvals ] #only positive eigenvals (returns copy)
 	nevals = accVars.shape[0]

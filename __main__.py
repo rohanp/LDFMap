@@ -6,7 +6,7 @@ from time import time
 import os
 
 def main():
-	run("input/2FS1/5000_2FS1.pdb", 431, 5000)
+	run("input/Met-Enk_AMBER/Met-Enk_combined.pdb", 40, 6180)
 
 def run(filename, num_atoms, num_models):
 	start = time()
@@ -16,7 +16,7 @@ def run(filename, num_atoms, num_models):
 	coords = LDFMap.PDBParser(filename, num_atoms, num_models)
 	print("File Parsed in {0} seconds".format(round(time()-start,3)))
 
-	name = filename[filename.find('/')+1:-4]
+	name = filename.split('/')[-1][:-4]
 
 	if not os.path.exists("output/" + name):
 		os.makedirs("output/" + name)
@@ -40,7 +40,7 @@ def run(filename, num_atoms, num_models):
 	P = LDFMap.calcMarkov(RMSD, epsilons)
 	print("Completed markov transition matrix in {0} seconds".format(round(time()-t0,3)))
 	print("Saving output to Output/markov.npy\n".format(name=name))
-	np.save('Output/{name}/markov.npy'.format(name=name), P)
+	np.save('output/{name}/markov.npy'.format(name=name), P)
 
 	t0 = time()
 	print("Calculating eigenvalues and eigenvectors")
