@@ -1,0 +1,5 @@
+cd src;
+python3 setup.py build_ext --inplace;
+python3 setup_debug.py build_ext --inplace;
+cp LDFMap.so ..;
+cp LDFMap_debug.so ..;

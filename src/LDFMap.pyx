@@ -1,7 +1,7 @@
 #cython: wraparound=False, boundscheck=False, cdivision=True
 #cython: profile=False, nonecheck=False, overflowcheck=False
 #cython: cdivision_warnings=False, unraisable_tracebacks=False
-
+ 
 """ A Python/Cython implementation of the Locally-Scaled Diffusion Map 
 	Dimensionality Reduction Technique.  
 """
@@ -29,9 +29,8 @@ def PDBParser(filename, num_atoms, num_models):
 
 		Returns
 		-------
-		array[float, float]
+		array[float, float], shape = (num_models, 3 * num_atoms)
 			Contains the XYZ coordinates of all atoms. 
-			shape = (num_models, 3 * num_atoms)
 
 		Raises
 		------
@@ -81,7 +80,7 @@ def calcRMSDs(coords, num_atoms, num_models):
 
 		Parameters
 		----------
-		coords : array[float, float]
+		coords : array[float, float], shape = (num_models, 3 * num_atoms)
 			Array of XYZ coordinates of all atoms in all models.
 			Should use `PDBParser` to create this array
 		num_atoms : int
@@ -89,7 +88,7 @@ def calcRMSDs(coords, num_atoms, num_models):
 
 		Returns
 		-------
-		array[float]
+		array[float], shape = (num_models,)
 			Containing pairwise lRMSD between all models. 
 			shape = (`num_models`, `num_models`)
 
@@ -324,7 +323,6 @@ def calcMarkov(RMSDs, epsilons):
 cdef double[:,:] _calcMarkovMatrix(double[:,:] RMSD, double[:] epsilons, int N):	
 	cdef: 
 		int i, j
-		#all are memoryviews
 		double[:] D = np.zeros(N)
 		double[:] Dtilda = np.zeros(N)
 		double[:,:] K = np.zeros((N,N))
@@ -384,17 +382,17 @@ def calcProj(P, eigenvecs):
 		P : array[float, float]
 			Markov matrix, contains transitional probability between models.
 		eigenvecs : array[float, float]
-			Contains eigenvectors (in columns)
+			Contains eigenvectors (in columns).
 
 		Returns
 		-------
 		array[float, float]
-			Projection of transition matrix onto eigenvectors
+			Projection of transition matrix onto eigenvectors.
 			.. math:: PE_v^t 
 
 		Notes
 		-----
-		Eigenvectors MUST be in columns
+		Eigenvectors MUST be in columns.
 
 	"""
 	return np.dot(P, eigenvecs.T)
@@ -405,27 +403,20 @@ def calcAccumVar(eigenvals):
 		Parameters
 		----------
 		eigenvals : array[float]
-			Contains eigenvalues sorted in descending order
+			Contains eigenvalues sorted in descending order.
 
 		Returns
 		-------
 		array[float]
-			Accumulated variance captured by eigenvalues
+			Accumulated variance captured by eigenvalues.
 	"""
-	accVars = eigenvals[ 0 < eigenvals ] #only positive eigenvals (returns copy)
-	nevals = accVars.shape[0]
-	
-	for i in range(1, nevals):
-		previous = accVars[i-1]
-		accVars[i] += previous
-	
-	for i in range(0, nevals):
-		accVars[i] /= accVars[nevals-1]
-		accVars[i] *= 100.0
+	#only positive eigenvals (returns copy)
+	accVars = eigenvals[ 0 < eigenvals ]
+
+	accVars = np.cumsum(accVars)
+	accVars /= accVars[ accVars.shape[0] - 1 ]
+	accVars *= 100
 
 	return accVars
-
-
-
 
 

@@ -14,6 +14,7 @@ x = int(num_models) - 1
 outfile = open(num_models + '_' + name + '.pdb', 'w')
 write = False
 
+#native structure is first model in output PDB
 with open(name + '.exp.pdb', 'r') as expfile:
 
     for line in expfile:
@@ -32,11 +33,14 @@ with open(name + '.exp.pdb', 'r') as expfile:
             continue
 
         if write:
-            outfile.write(line[:70] + '\n')
+            outfile.write(line[:70].strip() + '\n')
+
+    outfile.write("END MODEL\n")
 
 scores = open(name + '.scores', 'r').read().splitlines()
 keep = np.sort(np.random.choice(len(scores), x, replace=False))
 print(keep)
+np.savetxt(num_models + '_' + name + ".kept.txt", keep, fmt='%i')
 
 with open(name + '.pdb', 'r') as infile:
     for line in infile:
