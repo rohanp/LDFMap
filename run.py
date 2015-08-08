@@ -6,7 +6,27 @@ from time import time
 import os
 
 def main():
-	run("input/Met-Enk_AMBER/Met-Enk_combined.pdb", 40, 6180)
+        if len(sys.argv) == 3:
+                filename = sys.argv[1]
+                num_models = int(sys.argv[2])
+        else:
+                filename = "input/SOD1/20000_SOD1.pdb"
+                num_models = 20000
+
+        num_atoms = get_num_atoms(filename)
+        print("num atoms: ", num_atoms)
+
+        run(filename, num_atoms, num_models)
+
+def get_num_atoms(filename):
+        num_atoms = 0
+        with open(filename, 'r') as f:
+                for line in f:
+                        if 'ATOM' in line:
+                                num_atoms += 1
+                        if 'END' in line:
+                                break
+        return num_atoms
 
 def run(filename, num_atoms, num_models):
 	start = time()

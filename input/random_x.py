@@ -10,10 +10,11 @@ os.chdir(sys.argv[1])
 
 name = sys.argv[1]
 num_models = sys.argv[2]
-x = int(num_models) - 1
+x = int(num_models)
 outfile = open(num_models + '_' + name + '.pdb', 'w')
 write = False
 
+"""
 #native structure is first model in output PDB
 with open(name + '.exp.pdb', 'r') as expfile:
 
@@ -36,6 +37,7 @@ with open(name + '.exp.pdb', 'r') as expfile:
             outfile.write(line[:70].strip() + '\n')
 
     outfile.write("END MODEL\n")
+"""
 
 scores = open(name + '.scores', 'r').read().splitlines()
 keep = np.sort(np.random.choice(len(scores), x, replace=False))
