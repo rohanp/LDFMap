@@ -50,7 +50,7 @@ def run(filename, num_atoms, num_models):
 
 	t0 = time()
 	print("Calculating epsilons")
-	epsilons = LDFMap.calcEpsilons(RMSD, prints=True)
+	epsilons = LDFMap.calcEpsilons(RMSD)
 	print("Calculated epsilons in {0} seconds".format(round(time()-start,3)))	
 	print("Saving epsilons to output/{name}/epsilons.npy\n".format(name=name))
 	np.save('output/{name}/epsilons.npy'.format(name=name), epsilons)
