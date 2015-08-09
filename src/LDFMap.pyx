@@ -10,11 +10,10 @@ __author__ = "Rohan Pandit"
 import numpy as np
 cimport numpy as np
 from time import time
-from cython.parallel import prange
 from libc.math cimport sqrt, exp
 
 cdef extern from "rmsd.h" nogil:
-	double _rmsd(int n, double* x, double* y)
+	double rmsd(int n, double* x, double* y)
 
 def PDBParser(filename, num_atoms, num_models):
 	""" Parses PDB file for XYZ coordinates of all atoms in a format 
@@ -113,7 +112,7 @@ cdef _calcRMSDs(double[:,:] coords, long num_atoms, long num_models):
 		for i in range(num_models):
 			for j in range(i+1, num_models):
 				# '&' because rmsd is a C++ function that takes pointers
-				RMSD_view[i, j] = _rmsd(num_atoms*3, &coords[i,0], &coords[j,0])
+				RMSD_view[i, j] = rmsd(num_atoms*3, &coords[i,0], &coords[j,0])
 				RMSD_view[j, i] = RMSD_view[i, j]
 
 	return RMSD

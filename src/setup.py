@@ -17,11 +17,11 @@ setup(
     url='https://www.github.com/rohanp/LDFMap',
     ext_modules = cythonize([Extension("LDFMap", 
     					sources = ["LDFMap.pyx"],
-    					include_dirs = [np.get_include(), "/Users/rohanp/LDFMap/src/include"],
+    					include_dirs = [np.get_include(), "/home/ubuntu/LDFMap/src/include"],
     					language="c++",
     					libraries = ["lapack", "blas"],
-    					library_dirs = ["/Users/rohanp/LDFMap/src/include"],
-    					extra_compile_args = ["-I /Users/rohanp/LDFMap/src/include", "-I /usr/local/include"],
+    					library_dirs = ["/home/ubuntu/LDFMap/src/include"],
+    					extra_compile_args = ["-I /home/ubuntu/LDFMap/src/include", "-I /usr/local/include"],
                         #extra_link_args = ['-fopenmp']
     					)])
    							
