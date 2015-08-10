@@ -1,9 +1,9 @@
 import LDFMap
-import LDFMap_debug
 import numpy as np
 from matplotlib import pyplot
 from time import time
 import os
+import sys
 
 def main():
         if len(sys.argv) == 3:
@@ -50,7 +50,7 @@ def run(filename, num_atoms, num_models):
 
 	t0 = time()
 	print("Calculating epsilons")
-	epsilons = LDFMap.calcEpsilons(RMSD, prints=True)
+	epsilons = LDFMap.calcEpsilons(RMSD, sample_size=2000)
 	print("Calculated epsilons in {0} seconds".format(round(time()-start,3)))	
 	print("Saving epsilons to output/{name}/epsilons.npy\n".format(name=name))
 	np.save('output/{name}/epsilons.npy'.format(name=name), epsilons)
@@ -81,38 +81,6 @@ def run(filename, num_atoms, num_models):
 	np.save('output/{name}/accum_var.npy'.format(name=name), accumVar)
 
 	print("Done! Total time: {0} seconds".format(round(time() - start, 3)))
-
-
-def time_trials():
-	xs = [1000, 2000, 4000, 6000]
-	ys = []
-
-	for x in xs:
-		t0 = time()
-		print("Calculating RMSD")
-		RMSD = LDFMap.calcRMSDs(coords[:x,:], 40, x)
-		print("Calculated RMSD in {0} seconds".format(round(time()-t0,3)))
-		np.savetxt('Output/RMSD.txt', RMSD)
-
-		print("Calculating Epsilons")
-		epsilons = LDFMap.calcEpsilons(RMSD)
-		print("Calculated Epsilons in {0} seconds".format(round(time()-t0,3)))
-		np.savetxt('Output/epsilons.txt', epsilons)
-
-		print("Calculating Markov Matrix")
-		P = LDFMap.calcMarkovMatrix(RMSD, epsilons)
-		print("Calculated Markov Matrix in {0} seconds".format(round(time()-t0,3)))
-		np.savetxt('Output/markov.txt', P)
-
-		ys.append(time() - t0)
-
-	print(ys)
-
-	pyplot.plot(xs, ys)
-	pyplot.xlabel("Num Models")
-	pyplot.ylabel("Runtime (seconds)")
-	pyplot.show()
-
 
 
 if __name__ == "__main__": main()

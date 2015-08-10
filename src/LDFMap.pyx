@@ -12,9 +12,10 @@ cimport numpy as np
 from time import time
 from cython.parallel import prange
 from libc.math cimport sqrt, exp
+import random
 
 cdef extern from "rmsd.h" nogil:
-	double _rmsd(int n, double* x, double* y)
+	double rmsd(int n, double* x, double* y)
 
 def PDBParser(filename, num_atoms, num_models):
 	""" Parses PDB file for XYZ coordinates of all atoms in a format 
@@ -113,12 +114,12 @@ cdef _calcRMSDs(double[:,:] coords, long num_atoms, long num_models):
 		for i in range(num_models):
 			for j in range(i+1, num_models):
 				# '&' because rmsd is a C++ function that takes pointers
-				RMSD_view[i, j] = _rmsd(num_atoms*3, &coords[i,0], &coords[j,0])
+				RMSD_view[i, j] = rmsd(num_atoms*3, &coords[i,0], &coords[j,0])
 				RMSD_view[j, i] = RMSD_view[i, j]
 
 	return RMSD
 
-def calcEpsilons(RMSDs, cutoff = 0.03):
+def calcEpsilons(RMSDs, cutoff = 0.03, sample_size=None):
 	""" Implements algorithm described in Clementi et al. to estimate the 
 		distance around each model which can be considered locally flat.
 
@@ -152,15 +153,17 @@ def calcEpsilons(RMSDs, cutoff = 0.03):
 
 	print("Max RMSD: {0}".format(np.max(RMSDs)))
 
+	if not sample_size: sample_size = RMSDs.shape[0]
+
 	epsilons = np.ones(RMSDs.shape[0])
 
 	for xi in range(RMSDs.shape[0]):
 		if not xi % 10: print("On Epsilon {0}".format(xi))  
-		epsilons[xi] = _calcEpsilon(xi, RMSDs, cutoff)
+		epsilons[xi] = _calcEpsilon(xi, RMSDs, cutoff, sample_size)
 
 	return epsilons
 
-cpdef double _calcEpsilon(int xi, RMSD, float cutoff):
+cpdef double _calcEpsilon(int xi, RMSD, float cutoff, int sample_size):
 	cdef:
 		int i, j, dim
 		double[:,:] eigenvals
@@ -171,6 +174,10 @@ cpdef double _calcEpsilon(int xi, RMSD, float cutoff):
 
 	max_epsilon = np.max(RMSD[xi])
 	possible_epsilons = np.array([3./7., 1./2., 4./7.]) * max_epsilon
+
+	if sample_size != RMSD.shape[0]:
+		sample_idxs = np.unique([0, xi] + random.sample(range(RMSD.shape[0]), sample_size))
+		RMSD = RMSD[sample_idxs, sample_idxs]
 
 	eigenvals = _calcMDS(xi, RMSD, possible_epsilons)
 
@@ -214,7 +221,7 @@ cdef double[:,:] _calcMDS(int xi, RMSD, double[:] possible_epsilons):
 	cdef:
 		double[:] A
 		double[:,:] neighbors_matrix
-		double[:,:] eigenvals_view = np.zeros( (possible_epsilons.shape[0], RMSD.shape[1]) ) 
+		double[:,:] eigenvals_view = np.zeros((possible_epsilons.shape[0], RMSD.shape[1])) 
 		int i, j
 		int max_neighbors = 0
 		double eps

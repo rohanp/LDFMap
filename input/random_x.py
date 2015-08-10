@@ -40,13 +40,13 @@ with open(name + '.exp.pdb', 'r') as expfile:
 """
 
 scores = open(name + '.scores', 'r').read().splitlines()
-keep = np.sort(np.random.choice(len(scores), x, replace=False))
+keep = np.sort(np.random.choice(50501, x, replace=False)) 
 print(keep)
 np.savetxt(num_models + '_' + name + ".kept.txt", keep, fmt='%i')
 
 with open(name + '.pdb', 'r') as infile:
     for line in infile:
-        if "MODEL" in line and not "END" in line: #Model lines are 15 chars long
+        if len(line) == 15: #Model lines are 15 chars long
             model_num = int(line.split()[1])
             if model_num in keep:
                 write = True
