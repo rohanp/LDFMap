@@ -4,31 +4,39 @@ from matplotlib import pyplot
 from time import time
 import os
 import sys
+from concurrent.futures import ProcessPoolExecutor
+from functools import partial 
 
 def main():
-        if len(sys.argv) == 3:
-                filename = sys.argv[1]
-                num_models = int(sys.argv[2])
-        else:
-                filename = "input/SOD1/20000_SOD1.pdb"
-                num_models = 20000
+		sample_size = None
 
-        num_atoms = get_num_atoms(filename)
-        print("num atoms: ", num_atoms)
+		if len(sys.argv) == 3:
+				filename = sys.argv[1]
+				num_models = int(sys.argv[2])
+		elif len(sys.argv) == 4:
+				filename = sys.argv[1]
+				num_models = int(sys.argv[2])
+				sample_size = int(sys.argv[3])       	
+		else:
+				filename = "input/SOD1/20000_SOD1.pdb"
+				num_models = 20000
 
-        run(filename, num_atoms, num_models)
+		num_atoms = get_num_atoms(filename)
+		print("num atoms: ", num_atoms)
+
+		run(filename, num_atoms, num_models, sample_size)
 
 def get_num_atoms(filename):
-        num_atoms = 0
-        with open(filename, 'r') as f:
-                for line in f:
-                        if 'ATOM' in line:
-                                num_atoms += 1
-                        if 'END' in line:
-                                break
-        return num_atoms
+		num_atoms = 0
+		with open(filename, 'r') as f:
+				for line in f:
+						if 'ATOM' in line:
+								num_atoms += 1
+						if 'END' in line:
+								break
+		return num_atoms
 
-def run(filename, num_atoms, num_models):
+def run(filename, num_atoms, num_models, sample_size=None):
 	start = time()
 
 	t0 = time()
@@ -40,17 +48,20 @@ def run(filename, num_atoms, num_models):
 
 	if not os.path.exists("output/" + name):
 		os.makedirs("output/" + name)
-	
+
+	"""
 	t0 = time()
 	print("Calculating RMSD")
 	RMSD = LDFMap.calcRMSDs(coords, num_atoms, num_models)
 	print("Calculated RMSD in {0} seconds".format(round(time()-start,3)))
 	print("Saving RMSD to 'Output/RSMD.npy'\n")
 	np.save('output/{name}/RMSD.npy'.format(name=name), RMSD)
+	"""
+	RMSD = np.load('output/{name}/RMSD.npy'.format(name=name))
 
 	t0 = time()
 	print("Calculating epsilons")
-	epsilons = LDFMap.calcEpsilons(RMSD, sample_size=2000)
+	epsilons = LDFMap.calcEpsilons(RMSD, sample_size=sample_size)
 	print("Calculated epsilons in {0} seconds".format(round(time()-start,3)))	
 	print("Saving epsilons to output/{name}/epsilons.npy\n".format(name=name))
 	np.save('output/{name}/epsilons.npy'.format(name=name), epsilons)

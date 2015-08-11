@@ -3,27 +3,29 @@ from matplotlib import pyplot
 import matplotlib.patches as mpatches
 import sys
 from matplotlib import cm
+import os
 
 #usage: python plot/plot.py Met-Enk_AMBER
 name = sys.argv[1]
 protein_name = sys.argv[1].split('_')[1]
 
 def main():
-	print("reading input")
-	#scores = np.loadtxt("input/%s/%s.scores"%(protein_name, protein_name))
-	#models = np.loadtxt("input/%s/%s.kept.txt"%(protein_name, protein_name), dtype=int)
 
-	#proj = np.load("output/%s/projections.npy"%name)
-	#accumVar = np.load("output/%s/accum_var.npy"%name)
-	#RMSD = np.load("output/%s/RMSD.npy"%name)
+	if not os.path.exists("output/%s/plots"%name):	
+			os.makedirs("output/%s/plots"%name)
+
+	print("reading input")
+	scores = np.loadtxt("input/%s/%s.scores"%(protein_name, protein_name))
+	models = np.loadtxt("input/%s/%s.kept.txt"%(protein_name, name), dtype=int)
+
+	proj = np.load("output/%s/projections.npy"%name)
+	accumVar = np.load("output/%s/accum_var.npy"%name)
+	RMSD = np.load("output/%s/RMSD.npy"%name)
 
 	print("plotting")
-	#plotAccumVar(accumVar)
-	#plotProjEnergy(proj, scores, models)
-	#plotProjRMSD(proj, RMSD, models)
-
-	proj = np.load(name + "/projections.npy")
-	plotMetEnk(proj)
+	plotAccumVar(accumVar)
+	plotProjEnergy(proj, scores, models)
+	plotProjRMSD(proj, RMSD, models)
 
 def plotAccumVar(accumVar):
 	fig, ax=pyplot.subplots()
@@ -34,29 +36,9 @@ def plotAccumVar(accumVar):
 	pyplot.grid()
 	pyplot.xlabel("Eigenvalue Number")
 	pyplot.ylabel("Accumulated Variance")
-	#pyplot.show()
-
-def plotMetEnk(projMatrix):
-	x = projMatrix[:,0]
-	y = projMatrix[:,1]
-
-	x2 = projMatrix[180:,0]
-	y2 = projMatrix[180:,1]
-
-	pyplot.scatter(x2[:2000], y2[:2000], c='darkgreen')
-	pyplot.scatter(x2[2000:4000], y2[2000:4000], c='darkred')
-	pyplot.scatter(x2[4000:], y2[4000:], c='darkblue')
-
-	pyplot.scatter(x[:60], y[:60], c='lime')
-	pyplot.scatter(x[60:120], y[60:120], c='r')
-	pyplot.scatter(x[120:180], y[120:180], c='b')
-
-	pyplot.axis([min(x), max(x),min(y),max(y)])
-	pyplot.xlabel("DC1")
-	pyplot.ylabel("DC2")
-	pyplot.grid()
-
-	pyplot.show()	
+	pyplot.savefig("output/%s/plots/accum_var.png"%name, transparent=True, 
+				bbox_inches='tight', figsize=(3,3), dpi=300)
+	pyplot.show()
 
 
 def plotProjEnergy(projMatrix, scores, models):
@@ -68,10 +50,11 @@ def plotProjEnergy(projMatrix, scores, models):
 	highest_energy = scores[-1]
 	num_models = models.shape[0]
 
+	print(lowest_energy, highest_energy, num_models)
 	colors = np.linspace(lowest_energy, highest_energy, num_models)
 
-	pyplot.scatter(x[1:], y[1:], c=colors, cmap=cm.Blues)
-	pyplot.plot(x[0], y[0], 'rx', mew=2)[0].set_ms(8)
+	pyplot.scatter(x[1:], y[1:], c=colors, cmap=cm.jet)
+	pyplot.plot(x[0], y[0], 'kx', mew=3)[0].set_ms(10)
 
 	bar = pyplot.colorbar()
 	bar.set_label("Energy (low to high)")
@@ -82,7 +65,7 @@ def plotProjEnergy(projMatrix, scores, models):
 	pyplot.xlabel("DC1")
 	pyplot.ylabel("DC2")
 	pyplot.grid()
-	pyplot.savefig("output/%s/proj_energy.png"%name, transparent=True, 
+	pyplot.savefig("output/%s/plots/proj_energy.png"%name, transparent=True, 
 					bbox_inches='tight', figsize=(3,3), dpi=300)
 	pyplot.show()
 
@@ -109,11 +92,32 @@ def plotProjRMSD(projMatrix, RMSD, models):
 	pyplot.grid()
 	pyplot.legend(loc='upper right', scatterpoints=1, numpoints=1)
 
-	pyplot.savefig("output/%s/proj_rmsd.png"%name, transparent=True, 
+	pyplot.savefig("output/%s/plots/proj_rmsd.png"%name, transparent=True, 
 					bbox_inches='tight', figsize=(3,3), dpi=300)
 	pyplot.show()
 
 
+def plotMetEnk(projMatrix):
+	x = projMatrix[:,0]
+	y = projMatrix[:,1]
+
+	x2 = projMatrix[180:,0]
+	y2 = projMatrix[180:,1]
+
+	pyplot.scatter(x2[:2000], y2[:2000], c='darkgreen')
+	pyplot.scatter(x2[2000:4000], y2[2000:4000], c='darkred')
+	pyplot.scatter(x2[4000:], y2[4000:], c='darkblue')
+
+	pyplot.scatter(x[:60], y[:60], c='lime')
+	pyplot.scatter(x[60:120], y[60:120], c='r')
+	pyplot.scatter(x[120:180], y[120:180], c='b')
+
+	pyplot.axis([min(x), max(x),min(y),max(y)])
+	pyplot.xlabel("DC1")
+	pyplot.ylabel("DC2")
+	pyplot.grid()
+
+	pyplot.show()	
 
 if __name__ == "__main__":
 	main()

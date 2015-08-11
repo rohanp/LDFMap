@@ -19,11 +19,11 @@ from sklearn.cluster._dbscan_inner import dbscan_inner
 
 filename = sys.argv[1]
 
-K_MEANS = False
-AFFINITY_PROP = False
-MEAN_SHIFT = False
-AGGLOMERATIVE = False
-DBSCAN = True
+K_MEANS 		= True
+AFFINITY_PROP 	= False
+MEAN_SHIFT 		= True
+AGGLOMERATIVE 	= True
+DBSCAN 			= True
 
 #Example Usage: python cluster.py 5000_SOD1
 def main():
@@ -47,7 +47,7 @@ def main():
 		t0 = time()
 		print("Starting K-Means for", filename)
 
-		k = cluster.KMeans(n_clusters=num_clusters, n_jobs=-1).fit(RMSDs)
+		k = cluster.KMeans(n_clusters=10, n_jobs=-1).fit(RMSDs)
 
 		np.save("output/%s/k_means/cluster_centers"%filename, k.cluster_centers_)
 		np.save("output/%s/k_means/labels"%filename, k.labels_)
@@ -88,7 +88,7 @@ def main():
 		t0 = time()
 		print("Starting Mean Shift for", filename)
 
-		ms = cluster.MeanShift(bandwidth=np.mean(RMSD), bin_seeding=True).fit(RMSDs)
+		ms = cluster.MeanShift(bandwidth=np.mean(RMSDs), bin_seeding=False).fit(RMSDs)
 
 		np.save("output/%s/mean_shift/cluster_centers"%filename, ms.cluster_centers_)
 		np.save("output/%s/mean_shift/labels"%filename, ms.labels_)

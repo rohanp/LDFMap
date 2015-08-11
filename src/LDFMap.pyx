@@ -38,12 +38,6 @@ def PDBParser(filename, num_atoms, num_models):
 		ValueError
 			If the values of `num_atoms` and `num_models` are not
 			consistent with the contents in `filename`. 
-
-		Examples
-		--------
-		>>> coords = PDBParser("input/Met-Enk.pdb", 75, 180)
-		>>> RMSDs = calcRMSDs(coords, 75, 180)
-
 	"""
 
 	f = open(filename, 'r')
@@ -89,14 +83,8 @@ def calcRMSDs(coords, num_atoms, num_models):
 
 		Returns
 		-------
-		array[float], shape = (num_models,)
+		array[float, float], shape = (num_models, num_models)
 			Containing pairwise lRMSD between all models. 
-			shape = (`num_models`, `num_models`)
-
-		Examples
-		--------
-		>>> coords = PDBParser("input/Met-Enk.pdb", 75, 180)
-		>>> RMSDs = calcRMSDs(coords, 75, 180)
 		
 	"""
 
@@ -118,7 +106,7 @@ cdef _calcRMSDs(double[:,:] coords, long num_atoms, long num_models):
 				RMSD_view[j, i] = RMSD_view[i, j]
 
 	return RMSD
-
+	
 def calcEpsilons(RMSDs, cutoff = 0.03, sample_size=None):
 	""" Implements algorithm described in Clementi et al. to estimate the 
 		distance around each model which can be considered locally flat.
@@ -151,19 +139,19 @@ def calcEpsilons(RMSDs, cutoff = 0.03, sample_size=None):
 
 	"""
 
-	print("Max RMSD: {0}".format(np.max(RMSDs)))
+	print("Max RMSD: {0}".format(np.max(RMSDs))) 
 
 	if not sample_size: sample_size = RMSDs.shape[0]
 
 	epsilons = np.ones(RMSDs.shape[0])
 
 	for xi in range(RMSDs.shape[0]):
-		if not xi % 10: print("On Epsilon {0}".format(xi))  
+		if not xi % 10: print("On Epsilon {0}".format(xi))
 		epsilons[xi] = _calcEpsilon(xi, RMSDs, cutoff, sample_size)
 
 	return epsilons
 
-cpdef double _calcEpsilon(int xi, RMSD, float cutoff, int sample_size):
+cdef double _calcEpsilon(int xi, RMSD, float cutoff, int sample_size):
 	cdef:
 		int i, j, dim
 		double[:,:] eigenvals
@@ -174,12 +162,15 @@ cpdef double _calcEpsilon(int xi, RMSD, float cutoff, int sample_size):
 
 	max_epsilon = np.max(RMSD[xi])
 	possible_epsilons = np.array([3./7., 1./2., 4./7.]) * max_epsilon
+	RMSD_sample = np.zeros((sample_size, sample_size))
 
 	if sample_size != RMSD.shape[0]:
-		sample_idxs = np.unique([0, xi] + random.sample(range(RMSD.shape[0]), sample_size))
-		RMSD = RMSD[sample_idxs, sample_idxs]
+		sample_idxs = [xi] + random.sample(range(RMSD.shape[0]), sample_size - 1)
+		RMSD_sample = RMSD[sample_idxs, :][:, sample_idxs]
+	else:
+		RMSD_sample = RMSD
 
-	eigenvals = _calcMDS(xi, RMSD, possible_epsilons)
+	eigenvals = _calcMDS(xi, RMSD_sample, possible_epsilons)
 
 	#if there was error in _calcMDS, it returns -1
 	if eigenvals[0, 0] == -1:
@@ -227,8 +218,8 @@ cdef double[:,:] _calcMDS(int xi, RMSD, double[:] possible_epsilons):
 		double eps
 
 	for i, eps in enumerate(possible_epsilons):
-		#find indexes of all neighbors
-		neighbors_idxs = np.where( RMSD[xi,:] <= eps )[0]
+		#find indexes of all neighbors. First row of RMSD matrix is model xi.
+		neighbors_idxs = np.where( RMSD[0,:] <= eps )[0]
 
 		#ERROR: no neighbors. insert a -1 so that calcEpsilon knows
 		#an error has occured and will return the middle epsilon.
