@@ -6,14 +6,14 @@
 	Dimensionality Reduction Technique.  
 """
 __author__ = "Rohan Pandit" 
-
+ 
 import numpy as np
 cimport numpy as np
 from time import time
 from cython.parallel import prange
 from libc.math cimport sqrt, exp
 import random
-
+ 
 cdef extern from "rmsd.h" nogil:
 	double rmsd(int n, double* x, double* y)
 

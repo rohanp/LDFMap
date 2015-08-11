@@ -9,8 +9,6 @@ import os
 # you will have to change include_dirs, library_dirs, and extra_compile_args
 # to the absolute path of the Include directory in your system
 
-#os.environ["CC"] = "g++-5"
-#os.environ["CXX"] = "g++-5"
 
 setup(
     author = "Rohan Pandit",
@@ -20,9 +18,6 @@ setup(
     					include_dirs = [np.get_include(), "/Users/rohanp/LDFMap/src/include"],
     					language="c++",
     					libraries = ["lapack", "blas"],
-    					library_dirs = ["/Users/rohanp/LDFMap/src/include"],
-    					extra_compile_args = ["-I /Users/rohanp/LDFMap/src/include", "-I /usr/local/include"],
-                        #extra_link_args = ['-fopenmp']
     					)])
    							
    	)
