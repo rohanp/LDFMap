@@ -12,7 +12,6 @@ import os
 
 setup(
     author = "Rohan Pandit",
-    url='https://www.github.com/rohanp/LDFMap',
     ext_modules = cythonize([Extension("LDFMap", 
     					sources = ["LDFMap.pyx"],
     					include_dirs = [np.get_include(), "/Users/rohanp/LDFMap/src/include"],
